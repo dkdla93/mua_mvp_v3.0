@@ -327,6 +327,9 @@ var fileUploadManager = {
     setupFileInputs: function() {
         var self = this;
 
+        // 전체 업로드 영역을 클릭 가능하게 설정
+        this.setupClickableUploadAreas();
+
         // 엑셀 파일 입력
         var excelInput = document.getElementById('excel-file');
         if (excelInput) {
@@ -374,6 +377,44 @@ var fileUploadManager = {
 
         // 파일 입력 초기화 (재선택 허용)
         this.setupFileInputReset();
+    },
+
+    // 전체 업로드 영역을 클릭 가능하게 설정
+    setupClickableUploadAreas: function() {
+        var self = this;
+        var uploadAreas = document.querySelectorAll('.file-upload-area');
+
+        for (var i = 0; i < uploadAreas.length; i++) {
+            var area = uploadAreas[i];
+            area.classList.add('clickable');
+
+            // 클릭 이벤트 추가
+            area.addEventListener('click', function(e) {
+                // 버튼 클릭이 아닌 경우에만 파일 선택 창 열기
+                if (!e.target.classList.contains('btn') &&
+                    !e.target.classList.contains('btn-reset') &&
+                    !e.target.closest('.btn') &&
+                    !e.target.closest('.file-status-actions')) {
+                    var uploadId = this.id;
+                    var inputId = '';
+
+                    if (uploadId === 'excel-upload') {
+                        inputId = 'excel-file';
+                    } else if (uploadId === 'minimap-upload') {
+                        inputId = 'minimap-file';
+                    } else if (uploadId === 'scenes-upload') {
+                        inputId = 'scenes-files';
+                    }
+
+                    if (inputId) {
+                        var input = document.getElementById(inputId);
+                        if (input) {
+                            input.click();
+                        }
+                    }
+                }
+            });
+        }
     },
 
     setupFileInputReset: function() {
@@ -450,8 +491,32 @@ var fileUploadManager = {
 
                 // 성공 상태 표시
                 var materialCount = appState.materials.length;
-                self.showFileStatus('excel-status',
-                    '✅ 엑셀 파일 업로드 완료 (' + materialCount + '개 자재 추출)', 'success');
+                var statusMessage = '✅ 엑셀 파일 업로드 완료 (' + materialCount + '개 자재 추출)';
+
+                // 엑셀 시트별 정보 표시
+                if (appState.allSheets && Object.keys(appState.allSheets).length > 0) {
+                    statusMessage += '<div class="excel-sheet-info">';
+                    statusMessage += '<strong>업로드된 시트:</strong><br>';
+                    var sheetNames = Object.keys(appState.allSheets);
+                    for (var i = 0; i < sheetNames.length; i++) {
+                        var sheetName = sheetNames[i];
+                        if (sheetName.indexOf('MAIN') === -1) { // MAIN 시트는 제외
+                            var sheetData = appState.allSheets[sheetName];
+                            var itemCount = sheetData && sheetData.length ? sheetData.length : 0;
+                            statusMessage += '<div class="excel-sheet-item">';
+                            statusMessage += '<span>' + sheetName + '</span>';
+                            statusMessage += '<span>' + itemCount + '개 자재</span>';
+                            statusMessage += '</div>';
+                        }
+                    }
+                    statusMessage += '</div>';
+                }
+
+                statusMessage += '<div class="file-status-actions">' +
+                    '<button class="btn-reset" onclick="fileUploadManager.resetUploadArea(\'excel-upload\')">다시 선택</button>' +
+                    '</div>';
+
+                self.showFileStatus('excel-status', statusMessage, 'success');
 
                 stepController.checkStep1Completion();
 
@@ -502,7 +567,8 @@ var fileUploadManager = {
                     appState.minimapImage = e.target.result;
                     self.showFileStatus('minimap-status',
                         '✅ 미니맵 이미지 업로드 완료<br>' +
-                        '<small>크기: ' + img.width + ' × ' + img.height + 'px</small>' +
+                        '<img src="' + e.target.result + '" class="file-thumbnail" alt="미니맵 썸네일">' +
+                        '<small>크기: ' + img.width + ' × ' + img.height + 'px (' + utils.formatFileSize(file.size) + ')</small>' +
                         '<div class="file-status-actions">' +
                         '<button class="btn-reset" onclick="fileUploadManager.resetUploadArea(\'minimap-upload\')">다시 선택</button>' +
                         '</div>', 'success');
@@ -633,6 +699,13 @@ var fileUploadManager = {
                         var statusMessage = '';
                         if (successCount > 0) {
                             statusMessage += '✅ ' + successCount + '개의 장면 이미지 업로드 완료';
+
+                            // 썸네일 표시 추가
+                            statusMessage += '<div class="scenes-thumbnails">';
+                            for (var i = 0; i < appState.sceneImages.length; i++) {
+                                statusMessage += '<img src="' + appState.sceneImages[i].data + '" class="scene-thumbnail" alt="장면 ' + (i + 1) + '">';
+                            }
+                            statusMessage += '</div>';
                         }
                         if (errorCount > 0) {
                             statusMessage += (successCount > 0 ? '<br>' : '') +
@@ -891,8 +964,7 @@ var stepController = {
             stepController.goToStep(3);
         });
         document.getElementById('generate-ppt').addEventListener('click', function() {
-            // PPT 생성 로직은 나중에 구현
-            alert('PPT 생성 기능은 구현 예정입니다.');
+            stepController.generatePPT();
         });
     },
 
@@ -931,6 +1003,7 @@ var stepController = {
                 break;
             case 4:
                 // 생성 & 다운로드 단계 초기화
+                this.initStep4();
                 break;
         }
     },
@@ -967,6 +1040,234 @@ var stepController = {
                 nextButton.title = '최소 하나의 장면에 자재를 배치해야 합니다';
             }
         }
+    },
+
+    // 4단계 초기화
+    initStep4: function() {
+        var previewArea = document.getElementById('preview-area');
+        if (!previewArea) return;
+
+        var html = '<div class="ppt-preview-container">';
+        html += '<h3>착공도서 PPT 미리보기</h3>';
+        html += '<div class="preview-summary">';
+        html += '<div class="summary-card">';
+        html += '<h4>프로젝트 정보</h4>';
+        html += '<p><strong>공정:</strong> ' + appState.processes.length + '개</p>';
+        html += '<p><strong>장면:</strong> ' + this.getSelectedScenesCount() + '개</p>';
+        html += '<p><strong>배치된 자재:</strong> ' + this.getPlacedMaterialsCount() + '개</p>';
+        html += '</div>';
+        html += '<div class="summary-card">';
+        html += '<h4>생성될 슬라이드</h4>';
+        html += '<ul id="slide-preview-list"></ul>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        previewArea.innerHTML = html;
+
+        // 슬라이드 미리보기 생성
+        this.generateSlidePreview();
+
+        // 생성 버튼 활성화
+        var generateButton = document.getElementById('generate-ppt');
+        if (generateButton) {
+            generateButton.disabled = false;
+            generateButton.textContent = 'PPT 생성';
+        }
+    },
+
+    // 선택된 장면 개수 계산
+    getSelectedScenesCount: function() {
+        var count = 0;
+        for (var i = 0; i < appState.processes.length; i++) {
+            if (appState.processes[i].selectedScenes) {
+                count += appState.processes[i].selectedScenes.length;
+            }
+        }
+        return count;
+    },
+
+    // 배치된 자재 개수 계산
+    getPlacedMaterialsCount: function() {
+        var count = 0;
+        if (appState.sceneMaterialPositions) {
+            for (var sceneId in appState.sceneMaterialPositions) {
+                count += appState.sceneMaterialPositions[sceneId].length;
+            }
+        }
+        return count;
+    },
+
+    // 슬라이드 미리보기 생성
+    generateSlidePreview: function() {
+        var slideList = document.getElementById('slide-preview-list');
+        if (!slideList) return;
+
+        var html = '';
+        html += '<li>표지 슬라이드</li>';
+
+        for (var i = 0; i < appState.processes.length; i++) {
+            var process = appState.processes[i];
+            if (process.selectedScenes && process.selectedScenes.length > 0) {
+                html += '<li>' + process.name + ' (' + process.selectedScenes.length + '개 장면)</li>';
+            }
+        }
+
+        html += '<li>자재표 요약</li>';
+        slideList.innerHTML = html;
+    },
+
+    // PPT 생성
+    generatePPT: function() {
+        utils.showLoading('PPT를 생성하고 있습니다...');
+
+        try {
+            // PptxGenJS 라이브러리 확인
+            if (typeof PptxGenJS === 'undefined') {
+                throw new Error('PPT 생성 라이브러리를 찾을 수 없습니다.');
+            }
+
+            var pptx = new PptxGenJS();
+
+            // 표지 슬라이드 생성
+            this.createCoverSlide(pptx);
+
+            // 각 공정별 슬라이드 생성
+            for (var i = 0; i < appState.processes.length; i++) {
+                var process = appState.processes[i];
+                if (process.selectedScenes && process.selectedScenes.length > 0) {
+                    this.createProcessSlide(pptx, process);
+                }
+            }
+
+            // 자재표 요약 슬라이드 생성
+            this.createMaterialSummarySlide(pptx);
+
+            // PPT 파일 다운로드
+            pptx.save('착공도서_' + new Date().toISOString().substr(0, 10));
+
+            utils.hideLoading();
+            utils.showSuccess('PPT가 성공적으로 생성되었습니다!');
+
+        } catch (error) {
+            console.error('PPT 생성 오류:', error);
+            utils.hideLoading();
+            utils.showError('PPT 생성 중 오류가 발생했습니다: ' + error.message);
+        }
+    },
+
+    // 표지 슬라이드 생성
+    createCoverSlide: function(pptx) {
+        var slide = pptx.addSlide();
+        slide.addText('착공도서 자동생성 시스템', {
+            x: 1, y: 2, w: 8, h: 1,
+            fontSize: 36, color: '363636', bold: true, align: 'center'
+        });
+        slide.addText('인테리어 공사 착공도서', {
+            x: 1, y: 3, w: 8, h: 0.5,
+            fontSize: 24, color: '666666', align: 'center'
+        });
+        slide.addText('생성일: ' + new Date().toLocaleDateString('ko-KR'), {
+            x: 1, y: 6, w: 8, h: 0.5,
+            fontSize: 16, color: '888888', align: 'center'
+        });
+    },
+
+    // 공정별 슬라이드 생성
+    createProcessSlide: function(pptx, process) {
+        var slide = pptx.addSlide();
+        slide.addText(process.name, {
+            x: 0.5, y: 0.5, w: 9, h: 1,
+            fontSize: 28, color: '363636', bold: true
+        });
+
+        // 선택된 장면들 정보 추가
+        var sceneText = '선택된 장면: ';
+        for (var i = 0; i < process.selectedScenes.length; i++) {
+            var sceneIndex = process.selectedScenes[i];
+            var sceneData = appState.sceneImages[sceneIndex];
+            if (sceneData) {
+                sceneText += sceneData.name;
+                if (i < process.selectedScenes.length - 1) sceneText += ', ';
+            }
+        }
+
+        slide.addText(sceneText, {
+            x: 0.5, y: 1.5, w: 9, h: 1,
+            fontSize: 16, color: '666666'
+        });
+
+        // 배치된 자재 정보 추가
+        var materialInfo = this.getMaterialInfoForProcess(process);
+        if (materialInfo.length > 0) {
+            slide.addText('배치된 자재:', {
+                x: 0.5, y: 2.5, w: 9, h: 0.5,
+                fontSize: 18, color: '363636', bold: true
+            });
+
+            var materialText = materialInfo.join('\n');
+            slide.addText(materialText, {
+                x: 0.5, y: 3, w: 9, h: 3,
+                fontSize: 14, color: '555555'
+            });
+        }
+    },
+
+    // 자재표 요약 슬라이드 생성
+    createMaterialSummarySlide: function(pptx) {
+        var slide = pptx.addSlide();
+        slide.addText('자재표 요약', {
+            x: 0.5, y: 0.5, w: 9, h: 1,
+            fontSize: 28, color: '363636', bold: true
+        });
+
+        var summary = this.generateMaterialSummary();
+        slide.addText(summary, {
+            x: 0.5, y: 1.5, w: 9, h: 5,
+            fontSize: 14, color: '555555'
+        });
+    },
+
+    // 공정별 자재 정보 생성
+    getMaterialInfoForProcess: function(process) {
+        var materials = [];
+        if (!appState.sceneMaterialPositions || !process.selectedScenes) return materials;
+
+        for (var i = 0; i < process.selectedScenes.length; i++) {
+            var sceneIndex = process.selectedScenes[i];
+            var placements = appState.sceneMaterialPositions[sceneIndex];
+
+            if (placements && placements.length > 0) {
+                for (var j = 0; j < placements.length; j++) {
+                    materials.push('• ' + placements[j].materialName + ' (' + placements[j].materialCategory + ')');
+                }
+            }
+        }
+
+        return materials;
+    },
+
+    // 자재 요약 생성
+    generateMaterialSummary: function() {
+        var summary = '총 ' + this.getPlacedMaterialsCount() + '개의 자재가 배치되었습니다.\n\n';
+
+        // 카테고리별 자재 개수
+        var categories = {};
+        if (appState.sceneMaterialPositions) {
+            for (var sceneId in appState.sceneMaterialPositions) {
+                var placements = appState.sceneMaterialPositions[sceneId];
+                for (var i = 0; i < placements.length; i++) {
+                    var category = placements[i].materialCategory;
+                    categories[category] = (categories[category] || 0) + 1;
+                }
+            }
+        }
+
+        for (var category in categories) {
+            summary += category + ': ' + categories[category] + '개\n';
+        }
+
+        return summary;
     }
 };
 
@@ -1037,15 +1338,40 @@ var excelParser = {
                 console.log('시트 "' + sheetName + '" 파싱 완료:', jsonData.length + '행');
             }
 
-            // 우선순위 기반 시트 선택
-            var prioritySheet = this.selectPrioritySheet(sheetNames);
-            appState.currentSheet = prioritySheet;
-            appState.excelData = appState.allSheets[prioritySheet];
+            // 모든 시트에서 자재 데이터 추출 (A.MAIN 제외)
+            appState.materials = [];
+            appState.materialsBySheet = {};
 
-            console.log('선택된 시트:', prioritySheet);
+            for (var i = 0; i < sheetNames.length; i++) {
+                var sheetName = sheetNames[i];
 
-            // 지능형 자재 데이터 추출
-            this.extractMaterialsIntelligent();
+                // A.MAIN 시트는 표지이므로 스킵
+                if (sheetName.toUpperCase().indexOf('MAIN') !== -1) {
+                    continue;
+                }
+
+                console.log('시트 "' + sheetName + '" 자재 추출 시작');
+                appState.currentSheet = sheetName;
+                appState.excelData = appState.allSheets[sheetName];
+
+                // 각 시트별로 자재 추출
+                var sheetMaterials = this.extractMaterialsFromSheet(sheetName);
+                appState.materialsBySheet[sheetName] = sheetMaterials;
+
+                // 전체 자재 목록에 추가
+                appState.materials = appState.materials.concat(sheetMaterials);
+            }
+
+            // 기본 시트 선택 (첫 번째 자료 시트)
+            var firstDataSheet = null;
+            for (var i = 0; i < sheetNames.length; i++) {
+                if (sheetNames[i].toUpperCase().indexOf('MAIN') === -1) {
+                    firstDataSheet = sheetNames[i];
+                    break;
+                }
+            }
+            appState.currentSheet = firstDataSheet;
+            appState.excelData = appState.allSheets[firstDataSheet];
 
             console.log('엑셀 파싱 완료 - 총 자재:', appState.materials.length + '개');
 
@@ -1053,6 +1379,60 @@ var excelParser = {
             console.error('엑셀 파싱 오류 상세:', error);
             throw new Error('엑셀 파싱 중 오류: ' + error.message);
         }
+    },
+
+    // 특정 시트에서 자재 추출
+    extractMaterialsFromSheet: function(sheetName) {
+        var sheetMaterials = [];
+        var data = appState.allSheets[sheetName];
+
+        if (!data || data.length === 0) {
+            console.warn('시트 "' + sheetName + '" 데이터가 비어있습니다');
+            return sheetMaterials;
+        }
+
+        console.log('시트 "' + sheetName + '"에서 자재 추출 시작 - 총', data.length, '행');
+
+        // 헤더 위치 탐지
+        var headerInfo = this.detectHeaders(data);
+        console.log('시트 "' + sheetName + '" 헤더 정보:', headerInfo);
+
+        if (!headerInfo.headerRow) {
+            console.warn('시트 "' + sheetName + '"에서 헤더를 찾을 수 없습니다');
+            return sheetMaterials;
+        }
+
+        // 그룹화 상태 추적
+        var parsingState = {
+            currentCategory: '',
+            currentGroupLabel: '',
+            currentArea: '',
+            materialId: 1,
+            sheetName: sheetName
+        };
+
+        // 헤더 이후 데이터 행들 처리
+        for (var rowIndex = headerInfo.headerRow + 1; rowIndex < data.length; rowIndex++) {
+            var row = data[rowIndex];
+            if (!row || this.isEmptyRow(row)) continue;
+
+            var result = this.parseRowIntelligent(row, parsingState, headerInfo);
+
+            if (result.type === 'material' && result.data) {
+                // 시트명을 카테고리에 추가
+                result.data.category = sheetName;
+                result.data.originalCategory = result.data.category;
+                sheetMaterials.push(result.data);
+            }
+
+            // 파싱 상태 업데이트
+            if (result.stateUpdate) {
+                Object.assign(parsingState, result.stateUpdate);
+            }
+        }
+
+        console.log('시트 "' + sheetName + '"에서 추출된 자재:', sheetMaterials.length + '개');
+        return sheetMaterials;
     },
 
     selectPrioritySheet: function(sheetNames) {
@@ -1563,7 +1943,14 @@ var processManager = {
     },
 
     renderSceneSelection: function() {
-        var gridContainer = document.getElementById('scene-selection-grid');
+        this.renderAvailableScenes();
+        this.renderAllScenes();
+    },
+
+    renderAvailableScenes: function() {
+        var gridContainer = document.getElementById('available-scenes-grid');
+        if (!gridContainer) return;
+
         gridContainer.innerHTML = '';
 
         if (appState.sceneImages.length === 0) {
@@ -1572,29 +1959,88 @@ var processManager = {
         }
 
         var currentProcess = this.getCurrentProcess();
+        var availableScenes = this.getAvailableScenes();
+        var currentProcessId = currentProcess.id;
 
         for (var i = 0; i < appState.sceneImages.length; i++) {
             var scene = appState.sceneImages[i];
             var isSelected = currentProcess.selectedScenes.indexOf(i) !== -1;
+            var isUsedInOtherProcess = this.isSceneUsedInOtherProcess(i, currentProcessId);
+
+            if (isUsedInOtherProcess && !isSelected) continue; // 다른 공정에서 사용 중인 장면은 표시하지 않음
 
             var sceneItem = document.createElement('div');
-            sceneItem.className = 'scene-item' + (isSelected ? ' selected' : '');
+            sceneItem.className = 'scene-item' + (isSelected ? ' selected' : '') + (isUsedInOtherProcess ? ' disabled' : '');
+
+            var usedInProcess = this.getProcessUsingScene(i);
+            var statusText = isUsedInOtherProcess && !isSelected ? ' (사용 중: ' + usedInProcess + ')' : '';
+
             sceneItem.innerHTML =
                 '<img src="' + scene.data + '" alt="' + scene.name + '" class="scene-thumbnail">' +
-                '<div class="scene-name">' + scene.name + '</div>' +
-                '<input type="checkbox" ' + (isSelected ? 'checked' : '') + ' data-scene-index="' + i + '">';
+                '<div class="scene-name">' + scene.name + statusText + '</div>' +
+                '<input type="checkbox" ' + (isSelected ? 'checked' : '') + ' data-scene-index="' + i + '" ' +
+                (isUsedInOtherProcess && !isSelected ? 'disabled' : '') + '>';
 
             sceneItem.addEventListener('click', function(e) {
                 if (e.target.type !== 'checkbox') {
                     var checkbox = this.querySelector('input[type="checkbox"]');
-                    checkbox.checked = !checkbox.checked;
-                    checkbox.dispatchEvent(new Event('change'));
+                    if (!checkbox.disabled) {
+                        checkbox.checked = !checkbox.checked;
+                        checkbox.dispatchEvent(new Event('change'));
+                    }
                 }
             });
 
             sceneItem.querySelector('input').addEventListener('change', function() {
-                processManager.toggleSceneSelection(parseInt(this.getAttribute('data-scene-index')), this.checked);
+                if (!this.disabled) {
+                    processManager.toggleSceneSelection(parseInt(this.getAttribute('data-scene-index')), this.checked);
+                }
             });
+
+            gridContainer.appendChild(sceneItem);
+        }
+    },
+
+    renderAllScenes: function() {
+        var gridContainer = document.getElementById('all-scenes-grid');
+        if (!gridContainer) return;
+
+        gridContainer.innerHTML = '';
+
+        if (appState.sceneImages.length === 0) {
+            gridContainer.innerHTML = '<p>업로드된 장면 이미지가 없습니다.</p>';
+            return;
+        }
+
+        var currentProcess = this.getCurrentProcess();
+        var currentProcessId = currentProcess.id;
+
+        for (var i = 0; i < appState.sceneImages.length; i++) {
+            var scene = appState.sceneImages[i];
+            var isSelected = currentProcess.selectedScenes.indexOf(i) !== -1;
+            var usedInProcess = this.getProcessUsingScene(i);
+
+            var sceneItem = document.createElement('div');
+            sceneItem.className = 'scene-item readonly';
+
+            var statusClass = '';
+            var statusText = '';
+
+            if (isSelected) {
+                statusClass = ' current-selected';
+                statusText = ' (현재 공정에서 선택됨)';
+            } else if (usedInProcess) {
+                statusClass = ' other-used';
+                statusText = ' (사용 중: ' + usedInProcess + ')';
+            } else {
+                statusClass = ' available';
+                statusText = ' (사용 가능)';
+            }
+
+            sceneItem.className += statusClass;
+            sceneItem.innerHTML =
+                '<img src="' + scene.data + '" alt="' + scene.name + '" class="scene-thumbnail">' +
+                '<div class="scene-name">' + scene.name + statusText + '</div>';
 
             gridContainer.appendChild(sceneItem);
         }
@@ -1769,19 +2215,34 @@ var processManager = {
 
         var totalScenes = appState.sceneImages.length;
         var selectedCount = currentProcess.selectedScenes.length;
+        var availableScenes = this.getAvailableScenes();
+        var usedScenes = this.getUsedScenes();
 
         contentContainer.innerHTML =
             '<div class="process-header">' +
                 '<h3>' + currentProcess.name + ' - 장면 선택</h3>' +
                 '<div class="process-summary">' +
                     '<p>이 공정에 포함할 장면들을 선택하세요. (' + selectedCount + '/' + totalScenes + ' 선택됨)</p>' +
+                    '<div class="scene-status">' +
+                        '<span class="status-item available">사용 가능: ' + availableScenes.length + '개</span>' +
+                        '<span class="status-item used">다른 공정에서 사용 중: ' + usedScenes.length + '개</span>' +
+                    '</div>' +
                     '<div class="process-actions">' +
-                        '<button class="btn-secondary btn-small" onclick="processManager.selectAllScenes()">전체 선택</button>' +
+                        '<button class="btn-secondary btn-small" onclick="processManager.selectAllAvailableScenes()">사용가능한 장면 모두 선택</button>' +
                         '<button class="btn-secondary btn-small" onclick="processManager.deselectAllScenes()">전체 해제</button>' +
                     '</div>' +
                 '</div>' +
             '</div>' +
-            '<div id="scene-selection-grid" class="scene-grid"></div>';
+            '<div class="scene-lists-container">' +
+                '<div class="scene-list-section">' +
+                    '<h4>선택 가능한 장면</h4>' +
+                    '<div id="available-scenes-grid" class="scene-grid"></div>' +
+                '</div>' +
+                '<div class="scene-list-section">' +
+                    '<h4>전체 이미지 목록</h4>' +
+                    '<div id="all-scenes-grid" class="scene-grid readonly"></div>' +
+                '</div>' +
+            '</div>';
 
         this.renderSceneSelection();
     },
@@ -1878,6 +2339,73 @@ var processManager = {
         this.updateSceneItemAppearance(sceneIndex, isSelected);
         this.updateProcessSummary();
         this.updateProcessTabs(); // 탭의 장면 개수 업데이트
+        this.checkStep2Completion();
+    },
+
+    // 사용 가능한 장면들 가져오기 (다른 공정에서 사용하지 않는 장면들)
+    getAvailableScenes: function() {
+        var available = [];
+        var currentProcess = this.getCurrentProcess();
+        var currentProcessId = currentProcess ? currentProcess.id : null;
+
+        for (var i = 0; i < appState.sceneImages.length; i++) {
+            if (!this.isSceneUsedInOtherProcess(i, currentProcessId)) {
+                available.push(i);
+            }
+        }
+        return available;
+    },
+
+    // 다른 공정에서 사용 중인 장면들 가져오기
+    getUsedScenes: function() {
+        var used = [];
+        var currentProcess = this.getCurrentProcess();
+        var currentProcessId = currentProcess ? currentProcess.id : null;
+
+        for (var i = 0; i < appState.sceneImages.length; i++) {
+            if (this.isSceneUsedInOtherProcess(i, currentProcessId)) {
+                used.push(i);
+            }
+        }
+        return used;
+    },
+
+    // 특정 장면이 다른 공정에서 사용 중인지 확인
+    isSceneUsedInOtherProcess: function(sceneIndex, currentProcessId) {
+        for (var i = 0; i < appState.processes.length; i++) {
+            var process = appState.processes[i];
+            if (process.id !== currentProcessId &&
+                process.selectedScenes &&
+                process.selectedScenes.indexOf(sceneIndex) !== -1) {
+                return true;
+            }
+        }
+        return false;
+    },
+
+    // 특정 장면을 사용하고 있는 공정 이름 반환
+    getProcessUsingScene: function(sceneIndex) {
+        for (var i = 0; i < appState.processes.length; i++) {
+            var process = appState.processes[i];
+            if (process.selectedScenes && process.selectedScenes.indexOf(sceneIndex) !== -1) {
+                return process.name;
+            }
+        }
+        return null;
+    },
+
+    // 사용 가능한 장면들만 모두 선택
+    selectAllAvailableScenes: function() {
+        var currentProcess = this.getCurrentProcess();
+        if (!currentProcess) return;
+
+        var availableScenes = this.getAvailableScenes();
+        currentProcess.selectedScenes = availableScenes.slice(); // 배열 복사
+
+        console.log('사용 가능한 모든 장면 선택:', currentProcess.name, availableScenes.length + '개');
+        this.renderSceneSelection();
+        this.updateProcessSummary();
+        this.updateProcessTabs();
         this.checkStep2Completion();
     },
 
@@ -2068,32 +2596,42 @@ var workspaceManager = {
         }
     },
 
-    // 공정 선택 드롭다운 렌더링
+    // 공정 선택 탭 렌더링 (드롭다운에서 탭으로 변경)
     renderProcessSelector: function(parentElement) {
-        var selectorHTML = '<div class="process-selector">';
-        selectorHTML += '<label for="workspace-process-select">작업할 공정 선택:</label>';
-        selectorHTML += '<select id="workspace-process-select" class="form-select">';
-        selectorHTML += '<option value="">공정을 선택하세요</option>';
+        var selectorHTML = '<div class="process-tabs-workspace">';
+        selectorHTML += '<div class="workspace-tabs">';
 
         for (var i = 0; i < appState.processes.length; i++) {
             var process = appState.processes[i];
             var sceneCount = process.selectedScenes.length;
-            selectorHTML += '<option value="' + process.id + '">' +
-                process.name + ' (' + sceneCount + '개 장면)</option>';
+            var isActive = i === 0 ? ' active' : '';
+            selectorHTML += '<button class="workspace-tab' + isActive + '" data-process-id="' + process.id + '">';
+            selectorHTML += process.name + ' (' + sceneCount + '개 장면)';
+            selectorHTML += '</button>';
         }
 
-        selectorHTML += '</select></div>';
+        selectorHTML += '</div></div>';
 
         var selectorElement = document.createElement('div');
         selectorElement.innerHTML = selectorHTML;
         parentElement.appendChild(selectorElement);
 
-        // 선택 이벤트 바인딩
-        var selectElement = document.getElementById('workspace-process-select');
+        // 탭 클릭 이벤트 바인딩
+        var tabButtons = selectorElement.querySelectorAll('.workspace-tab');
         var self = this;
-        selectElement.addEventListener('change', function(e) {
-            var processId = e.target.value;
-            if (processId) {
+
+        for (var i = 0; i < tabButtons.length; i++) {
+            tabButtons[i].addEventListener('click', function(e) {
+                // 모든 탭의 active 클래스 제거
+                for (var j = 0; j < tabButtons.length; j++) {
+                    tabButtons[j].classList.remove('active');
+                }
+
+                // 클릭된 탭에 active 클래스 추가
+                this.classList.add('active');
+
+                var processId = this.getAttribute('data-process-id');
+                if (processId) {
                 self.selectProcess(processId);
             } else {
                 self.clearWorkspace();
@@ -2249,6 +2787,132 @@ var workspaceManager = {
                 self.scrollToScene(sceneIndex);
             });
         }
+
+        // 미니맵 이미지에 드래그 기능 추가
+        this.setupMinimapDrawing();
+    },
+
+    // 미니맵 드래그 그리기 기능 설정
+    setupMinimapDrawing: function() {
+        var self = this;
+        var minimapImage = document.querySelector('.minimap-image');
+        var minimapContainer = document.querySelector('.minimap-container');
+        var overlaysContainer = document.querySelector('.minimap-overlays');
+
+        if (!minimapImage || !minimapContainer) return;
+
+        // 오버레이 컨테이너가 없으면 생성
+        if (!overlaysContainer) {
+            overlaysContainer = document.createElement('div');
+            overlaysContainer.className = 'minimap-overlays';
+            overlaysContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;';
+            minimapContainer.appendChild(overlaysContainer);
+        }
+
+        var isDrawing = false;
+        var startX, startY;
+        var currentBox = null;
+
+        minimapImage.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            isDrawing = true;
+
+            var rect = minimapImage.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+
+            // 새로운 박스 생성
+            currentBox = document.createElement('div');
+            currentBox.className = 'minimap-draw-box';
+            currentBox.style.cssText =
+                'position: absolute; border: 2px solid #ff4444; background: rgba(255, 68, 68, 0.2); ' +
+                'left: ' + startX + 'px; top: ' + startY + 'px; width: 0; height: 0; pointer-events: none;';
+
+            overlaysContainer.appendChild(currentBox);
+        });
+
+        minimapImage.addEventListener('mousemove', function(e) {
+            if (!isDrawing || !currentBox) return;
+
+            var rect = minimapImage.getBoundingClientRect();
+            var currentX = e.clientX - rect.left;
+            var currentY = e.clientY - rect.top;
+
+            var left = Math.min(startX, currentX);
+            var top = Math.min(startY, currentY);
+            var width = Math.abs(currentX - startX);
+            var height = Math.abs(currentY - startY);
+
+            currentBox.style.left = left + 'px';
+            currentBox.style.top = top + 'px';
+            currentBox.style.width = width + 'px';
+            currentBox.style.height = height + 'px';
+        });
+
+        minimapImage.addEventListener('mouseup', function(e) {
+            if (!isDrawing || !currentBox) return;
+
+            isDrawing = false;
+
+            // 너무 작은 박스는 제거
+            if (parseInt(currentBox.style.width) < 10 || parseInt(currentBox.style.height) < 10) {
+                overlaysContainer.removeChild(currentBox);
+            } else {
+                // 박스에 삭제 버튼 추가
+                self.addBoxControls(currentBox);
+            }
+
+            currentBox = null;
+        });
+
+        // 초기화 버튼 추가
+        this.addResetButton();
+    },
+
+    // 박스에 삭제 컨트롤 추가
+    addBoxControls: function(box) {
+        var deleteBtn = document.createElement('div');
+        deleteBtn.innerHTML = '×';
+        deleteBtn.style.cssText =
+            'position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; ' +
+            'background: #ff4444; color: white; border-radius: 50%; text-align: center; ' +
+            'line-height: 20px; cursor: pointer; font-weight: bold; font-size: 14px; pointer-events: auto;';
+
+        deleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            box.parentNode.removeChild(box);
+        });
+
+        box.appendChild(deleteBtn);
+        box.style.pointerEvents = 'auto';
+    },
+
+    // 미니맵 초기화 버튼 추가
+    addResetButton: function() {
+        var minimapContainer = document.querySelector('.minimap-container');
+        if (!minimapContainer) return;
+
+        // 기존 버튼이 있으면 제거
+        var existingBtn = document.querySelector('.minimap-reset-btn');
+        if (existingBtn) {
+            existingBtn.parentNode.removeChild(existingBtn);
+        }
+
+        var resetBtn = document.createElement('button');
+        resetBtn.innerHTML = '미니맵 초기화';
+        resetBtn.className = 'btn btn-secondary minimap-reset-btn';
+        resetBtn.style.cssText = 'margin-top: 10px; margin-right: 10px;';
+        resetBtn.addEventListener('click', function() {
+            var overlaysContainer = document.querySelector('.minimap-overlays');
+            if (overlaysContainer) {
+                var drawBoxes = overlaysContainer.querySelectorAll('.minimap-draw-box');
+                for (var i = 0; i < drawBoxes.length; i++) {
+                    overlaysContainer.removeChild(drawBoxes[i]);
+                }
+            }
+        });
+
+        minimapContainer.parentNode.insertBefore(resetBtn, minimapContainer.nextSibling);
     },
 
     // 장면으로 스크롤 이동
@@ -2361,24 +3025,38 @@ var workspaceManager = {
 
             var html = '<div class="material-table-container">';
             html += '<p class="drag-instruction">자재를 클릭하고 드래그하여 장면 이미지에 배치하세요.</p>';
-            html += '<table class="material-table" id="material-table">';
-            html += '<thead><tr>';
-            html += '<th>번호</th><th>분류</th><th>자재명</th><th>시트</th>';
-            html += '</tr></thead><tbody>';
 
-            // appState.materials 배열을 사용하여 테이블 생성
-            for (var i = 0; i < appState.materials.length; i++) {
-                var material = appState.materials[i];
-                html += '<tr data-material-index="' + i + '">';
-                html += '<td>' + (material.id || i + 1) + '</td>';
-                html += '<td>' + (material.category || '일반') + '</td>';
-                html += '<td>' + (material.material || material.displayId || '자재 ' + (i + 1)) + '</td>';
-                html += '<td>' + (material.tabName || '') + '</td>';
-                html += '</tr>';
+            // 자재 탭 생성
+            if (appState.materialsBySheet && Object.keys(appState.materialsBySheet).length > 0) {
+                html += '<div class="material-tabs" id="material-tabs">';
+                var sheetNames = Object.keys(appState.materialsBySheet);
+
+                // 전체 탭 추가
+                html += '<button class="material-tab active" data-sheet="all">전체 (' + appState.materials.length + '개)</button>';
+
+                // 각 시트별 탭 추가
+                for (var i = 0; i < sheetNames.length; i++) {
+                    var sheetName = sheetNames[i];
+                    var sheetMaterials = appState.materialsBySheet[sheetName];
+                    html += '<button class="material-tab" data-sheet="' + sheetName + '">';
+                    html += sheetName + ' (' + sheetMaterials.length + '개)</button>';
+                }
+                html += '</div>';
             }
 
-            html += '</tbody></table></div>';
+            html += '<div class="material-table-content" id="material-table-content">';
+            html += '<table class="material-table" id="material-table">';
+            html += '<thead><tr>';
+            html += '<th>번호</th><th>분류</th><th>자재명</th><th>세부내용</th>';
+            html += '</tr></thead><tbody id="material-table-body">';
+            html += '</tbody></table>';
+            html += '</div>';
+            html += '</div>';
+
             contentElement.innerHTML = html;
+
+            // 탭 클릭 이벤트 바인딩
+            this.bindMaterialTabEvents();
 
             this.materialTableRendered = true;
 
@@ -2400,6 +3078,64 @@ var workspaceManager = {
                 contentElement.innerHTML = '<p class="empty-state">자재표 표시 중 오류가 발생했습니다.</p>';
             }
         }
+    },
+
+    // 자재 탭 이벤트 바인딩
+    bindMaterialTabEvents: function() {
+        var self = this;
+        var tabButtons = document.querySelectorAll('.material-tab');
+
+        for (var i = 0; i < tabButtons.length; i++) {
+            tabButtons[i].addEventListener('click', function(e) {
+                // 모든 탭의 active 클래스 제거
+                for (var j = 0; j < tabButtons.length; j++) {
+                    tabButtons[j].classList.remove('active');
+                }
+
+                // 클릭된 탭에 active 클래스 추가
+                this.classList.add('active');
+
+                var sheetName = this.getAttribute('data-sheet');
+                self.displayMaterialsForSheet(sheetName);
+            });
+        }
+
+        // 기본적으로 전체 자재 표시
+        this.displayMaterialsForSheet('all');
+    },
+
+    // 특정 시트의 자재들을 표시
+    displayMaterialsForSheet: function(sheetName) {
+        var tableBody = document.getElementById('material-table-body');
+        if (!tableBody) return;
+
+        var materialsToShow = [];
+
+        if (sheetName === 'all') {
+            materialsToShow = appState.materials || [];
+        } else if (appState.materialsBySheet && appState.materialsBySheet[sheetName]) {
+            materialsToShow = appState.materialsBySheet[sheetName];
+        }
+
+        var html = '';
+        for (var i = 0; i < materialsToShow.length; i++) {
+            var material = materialsToShow[i];
+            var globalIndex = appState.materials.indexOf(material);
+
+            html += '<tr data-material-index="' + globalIndex + '">';
+            html += '<td>' + (material.id || i + 1) + '</td>';
+            html += '<td>' + (material.category || '일반') + '</td>';
+            html += '<td>' + (material.material || material.displayId || '자재 ' + (i + 1)) + '</td>';
+            html += '<td>' + (material.item || material.area || '') + '</td>';
+            html += '</tr>';
+        }
+
+        tableBody.innerHTML = html;
+
+        // 드래그 소스 재설정
+        setTimeout(function() {
+            dragDropManager.setupMaterialDragSources();
+        }, 100);
     },
 
     // 작업공간 초기화
@@ -2582,6 +3318,9 @@ var dragDropManager = {
             sceneContainer.style.borderColor = '#667eea';
             sceneContainer.style.backgroundColor = '#f0f4ff';
             sceneContainer.style.transform = 'scale(1.02)';
+
+            // 드래그 커서 표시
+            self.showDragCursor(e, sceneImage);
         });
 
         // 드래그 진입
@@ -2595,6 +3334,7 @@ var dragDropManager = {
                 sceneContainer.style.borderColor = '';
                 sceneContainer.style.backgroundColor = '';
                 sceneContainer.style.transform = '';
+                self.hideDragCursor();
             }
         });
 
@@ -2605,25 +3345,33 @@ var dragDropManager = {
             sceneContainer.style.borderColor = '';
             sceneContainer.style.backgroundColor = '';
             sceneContainer.style.transform = '';
+            self.hideDragCursor();
 
             if (!self.draggedMaterial) return;
 
-            // 이미지 좌표 계산
+            // 이미지 좌표 계산 (더 정확한 계산)
             var imageRect = sceneImage.getBoundingClientRect();
-            var containerRect = sceneContainer.getBoundingClientRect();
+
+            // 스크롤 오프셋 고려
+            var scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+            var scrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
             var dropX = e.clientX - imageRect.left;
             var dropY = e.clientY - imageRect.top;
 
             // 좌표 정규화 (0-1 범위)
-            var normalizedX = dropX / imageRect.width;
-            var normalizedY = dropY / imageRect.height;
+            var normalizedX = Math.max(0, Math.min(1, dropX / imageRect.width));
+            var normalizedY = Math.max(0, Math.min(1, dropY / imageRect.height));
 
-            // 경계 검사
-            if (normalizedX < 0 || normalizedX > 1 || normalizedY < 0 || normalizedY > 1) {
-                utils.showError('자재는 이미지 영역 내에 배치해야 합니다.');
-                return;
-            }
+            console.log('드롭 좌표:', {
+                clientX: e.clientX,
+                clientY: e.clientY,
+                imageRect: imageRect,
+                dropX: dropX,
+                dropY: dropY,
+                normalizedX: normalizedX,
+                normalizedY: normalizedY
+            });
 
             self.addMaterialToScene(sceneId, self.draggedMaterial, normalizedX, normalizedY);
 
@@ -2980,6 +3728,48 @@ var dragDropManager = {
         }
 
         return isValid;
+    },
+
+    // 드래그 커서 표시
+    showDragCursor: function(e, sceneImage) {
+        var cursorId = 'drag-cursor-indicator';
+        var existingCursor = document.getElementById(cursorId);
+
+        if (!existingCursor) {
+            var cursor = document.createElement('div');
+            cursor.id = cursorId;
+            cursor.style.cssText =
+                'position: fixed; width: 20px; height: 20px; ' +
+                'background: rgba(102, 126, 234, 0.8); ' +
+                'border: 2px solid #667eea; ' +
+                'border-radius: 50%; ' +
+                'pointer-events: none; ' +
+                'z-index: 9999; ' +
+                'transform: translate(-50%, -50%);';
+            document.body.appendChild(cursor);
+            existingCursor = cursor;
+        }
+
+        // 이미지 영역 내에서만 표시
+        var imageRect = sceneImage.getBoundingClientRect();
+        var isInImage = (e.clientX >= imageRect.left && e.clientX <= imageRect.right &&
+                        e.clientY >= imageRect.top && e.clientY <= imageRect.bottom);
+
+        if (isInImage) {
+            existingCursor.style.left = e.clientX + 'px';
+            existingCursor.style.top = e.clientY + 'px';
+            existingCursor.style.display = 'block';
+        } else {
+            existingCursor.style.display = 'none';
+        }
+    },
+
+    // 드래그 커서 숨기기
+    hideDragCursor: function() {
+        var cursor = document.getElementById('drag-cursor-indicator');
+        if (cursor) {
+            cursor.style.display = 'none';
+        }
     }
 };
 
