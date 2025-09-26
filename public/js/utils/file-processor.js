@@ -51,7 +51,30 @@
             this.currentProcessing = 0;
             this.maxConcurrent = 3; // 동시 처리 파일 수 제한
 
-            console.log('FileProcessor 초기화 완료:', this.options);
+            // WorkerManager 연동 설정
+            this.useWebWorker = this.options.useWebWorker !== false;
+            this.workerManager = null;
+
+            // WorkerManager 초기화 시도
+            if (this.useWebWorker && typeof WorkerManager !== 'undefined') {
+                try {
+                    this.workerManager = new WorkerManager({
+                        workerPath: 'js/workers/file-worker.js',
+                        maxWorkers: 2,
+                        workerTimeout: 60000,
+                        enableFallback: true
+                    });
+                    console.log('FileProcessor: WorkerManager 연동 완료');
+                } catch (error) {
+                    console.warn('FileProcessor: WorkerManager 초기화 실패:', error);
+                    this.workerManager = null;
+                }
+            }
+
+            console.log('FileProcessor 초기화 완료:', {
+                options: this.options,
+                workerSupported: !!this.workerManager
+            });
         },
 
         /**
@@ -218,6 +241,88 @@
          * @param {Object} options - 처리 옵션
          */
         processExcelFile: function(file, options) {
+            var self = this;
+
+            return new Promise(function(resolve, reject) {
+                // WorkerManager가 사용 가능하면 Web Worker로 처리
+                if (self.workerManager) {
+                    self.processExcelWithWorker(file, options)
+                        .then(resolve)
+                        .catch(function(workerError) {
+                            console.warn('Worker 처리 실패, 폴백 처리 시도:', workerError);
+                            // Worker 실패시 기존 방식으로 폴백
+                            self.processExcelFallback(file, options)
+                                .then(resolve)
+                                .catch(reject);
+                        });
+                } else {
+                    // Worker 미지원시 기존 방식 사용
+                    self.processExcelFallback(file, options)
+                        .then(resolve)
+                        .catch(reject);
+                }
+            });
+        },
+
+        /**
+         * Web Worker를 이용한 Excel 처리
+         * @param {File} file - Excel 파일
+         * @param {Object} options - 처리 옵션
+         */
+        processExcelWithWorker: function(file, options) {
+            var self = this;
+
+            return new Promise(function(resolve, reject) {
+                var reader = new FileReader();
+
+                reader.onload = function(e) {
+                    try {
+                        var fileData = new Uint8Array(e.target.result);
+
+                        // 진행률 콜백 설정
+                        var onProgress = options.onProgress ? function(progressData) {
+                            options.onProgress({
+                                loaded: progressData.progress || 0,
+                                total: 100,
+                                percentage: progressData.progress || 0,
+                                stage: progressData.stage || 'processing'
+                            });
+                        } : null;
+
+                        // WorkerManager를 통해 Excel 처리
+                        self.workerManager.processExcelFile(fileData, {
+                            fileName: file.name,
+                            fileSize: file.size,
+                            options: options
+                        }, onProgress)
+                            .then(function(workerResult) {
+                                console.log('Excel Worker 처리 완료:', file.name);
+                                resolve(workerResult);
+                            })
+                            .catch(function(error) {
+                                console.error('Excel Worker 처리 실패:', error);
+                                reject(error);
+                            });
+
+                    } catch (error) {
+                        reject(new Error('Excel 파일 읽기 실패: ' + error.message));
+                    }
+                };
+
+                reader.onerror = function() {
+                    reject(new Error('파일 읽기 실패: ' + file.name));
+                };
+
+                reader.readAsArrayBuffer(file);
+            });
+        },
+
+        /**
+         * 기존 방식 Excel 처리 (폴백)
+         * @param {File} file - Excel 파일
+         * @param {Object} options - 처리 옵션
+         */
+        processExcelFallback: function(file, options) {
             var self = this;
 
             return new Promise(function(resolve, reject) {
@@ -421,6 +526,95 @@
          * @param {Object} options - 처리 옵션
          */
         processImageFile: function(file, options) {
+            var self = this;
+
+            return new Promise(function(resolve, reject) {
+                // WorkerManager가 사용 가능하면 Web Worker로 처리
+                if (self.workerManager && file.size > 1024 * 1024) { // 1MB 이상 파일만 Worker 사용
+                    self.processImageWithWorker(file, options)
+                        .then(resolve)
+                        .catch(function(workerError) {
+                            console.warn('Image Worker 처리 실패, 폴백 처리 시도:', workerError);
+                            // Worker 실패시 기존 방식으로 폴백
+                            self.processImageFallback(file, options)
+                                .then(resolve)
+                                .catch(reject);
+                        });
+                } else {
+                    // Worker 미지원시 또는 작은 파일일 때 기존 방식 사용
+                    self.processImageFallback(file, options)
+                        .then(resolve)
+                        .catch(reject);
+                }
+            });
+        },
+
+        /**
+         * Web Worker를 이용한 이미지 처리
+         * @param {File} file - 이미지 파일
+         * @param {Object} options - 처리 옵션
+         */
+        processImageWithWorker: function(file, options) {
+            var self = this;
+
+            return new Promise(function(resolve, reject) {
+                var reader = new FileReader();
+
+                reader.onload = function(e) {
+                    try {
+                        var fileData = new Uint8Array(e.target.result);
+
+                        // 진행률 콜백 설정
+                        var onProgress = options.onProgress ? function(progressData) {
+                            options.onProgress({
+                                loaded: progressData.progress || 0,
+                                total: 100,
+                                percentage: progressData.progress || 0,
+                                stage: progressData.stage || 'processing'
+                            });
+                        } : null;
+
+                        // WorkerManager를 통해 이미지 처리
+                        self.workerManager.processImageFile(
+                            fileData,
+                            file.type,
+                            file.name,
+                            {
+                                optimize: options.optimize,
+                                maxWidth: options.maxWidth,
+                                maxHeight: options.maxHeight,
+                                quality: options.quality
+                            },
+                            onProgress
+                        )
+                            .then(function(workerResult) {
+                                console.log('Image Worker 처리 완료:', file.name);
+                                resolve(workerResult);
+                            })
+                            .catch(function(error) {
+                                console.error('Image Worker 처리 실패:', error);
+                                reject(error);
+                            });
+
+                    } catch (error) {
+                        reject(new Error('이미지 파일 읽기 실패: ' + error.message));
+                    }
+                };
+
+                reader.onerror = function() {
+                    reject(new Error('파일 읽기 실패: ' + file.name));
+                };
+
+                reader.readAsArrayBuffer(file);
+            });
+        },
+
+        /**
+         * 기존 방식 이미지 처리 (폴백)
+         * @param {File} file - 이미지 파일
+         * @param {Object} options - 처리 옵션
+         */
+        processImageFallback: function(file, options) {
             var self = this;
 
             return new Promise(function(resolve, reject) {
@@ -660,6 +854,84 @@
          */
         clearQueue: function() {
             this.processingQueue = [];
+        },
+
+        /**
+         * WorkerManager 상태 확인
+         */
+        getWorkerStatus: function() {
+            if (this.workerManager) {
+                return this.workerManager.getStatus();
+            }
+            return { supported: false, message: 'WorkerManager를 사용할 수 없습니다' };
+        },
+
+        /**
+         * 파일 검증 with Worker 지원
+         * @param {Array} files - 검증할 파일들
+         * @param {Object} rules - 검증 규칙
+         */
+        validateFilesWithWorker: function(files, rules) {
+            var self = this;
+
+            // WorkerManager가 있으면 Worker로 검증
+            if (this.workerManager) {
+                return this.workerManager.validateFiles(files, rules);
+            }
+
+            // 폴백: 메인 스레드에서 검증
+            return new Promise(function(resolve) {
+                var results = [];
+                for (var i = 0; i < files.length; i++) {
+                    var file = files[i];
+                    var validation = {
+                        index: i,
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        valid: true,
+                        errors: []
+                    };
+
+                    try {
+                        self.validateFile(file, rules.expectedType);
+                    } catch (error) {
+                        validation.valid = false;
+                        validation.errors.push(error.message);
+                    }
+
+                    results.push(validation);
+                }
+                resolve({ results: results });
+            });
+        },
+
+        /**
+         * 리소스 정리 및 WorkerManager 종료
+         */
+        destroy: function() {
+            // 처리 대기 중인 작업들 취소
+            this.processingQueue.forEach(function(task) {
+                if (task.reject) {
+                    task.reject(new Error('FileProcessor가 종료되었습니다.'));
+                }
+            });
+
+            this.clearQueue();
+            this.currentProcessing = 0;
+
+            // WorkerManager 종료
+            if (this.workerManager) {
+                try {
+                    this.workerManager.terminate();
+                    console.log('FileProcessor: WorkerManager 종료 완료');
+                } catch (error) {
+                    console.warn('FileProcessor: WorkerManager 종료 중 오류:', error);
+                }
+                this.workerManager = null;
+            }
+
+            console.log('FileProcessor 정리 완료');
         }
     };
 

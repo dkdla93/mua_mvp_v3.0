@@ -2586,6 +2586,77 @@ var processManager = {
 };
 
 // ============================================================================
+// 반응형 좌표 시스템 관리자
+// ============================================================================
+var coordinateSystemManager = {
+    systems: new Map(), // 각 컨테이너별 좌표 시스템 저장
+
+    /**
+     * 좌표 시스템 초기화
+     */
+    init: function() {
+        console.log('좌표 시스템 관리자 초기화');
+    },
+
+    /**
+     * 특정 컨테이너에 좌표 시스템 생성
+     * @param {string} containerId - 컨테이너 ID
+     * @param {Object} options - 좌표 시스템 옵션
+     */
+    createSystem: function(containerId, options) {
+        var container = document.getElementById(containerId);
+        if (!container) {
+            console.error('좌표 시스템: 컨테이너를 찾을 수 없습니다:', containerId);
+            return null;
+        }
+
+        // 기존 시스템이 있으면 정리
+        if (this.systems.has(containerId)) {
+            this.systems.get(containerId).destroy();
+        }
+
+        // 새로운 좌표 시스템 생성
+        var system = new ResponsiveCoordinateSystem(container, options);
+        this.systems.set(containerId, system);
+
+        console.log('좌표 시스템 생성:', containerId);
+        return system;
+    },
+
+    /**
+     * 좌표 시스템 가져오기
+     * @param {string} containerId - 컨테이너 ID
+     */
+    getSystem: function(containerId) {
+        return this.systems.get(containerId) || null;
+    },
+
+    /**
+     * 좌표 시스템 제거
+     * @param {string} containerId - 컨테이너 ID
+     */
+    destroySystem: function(containerId) {
+        var system = this.systems.get(containerId);
+        if (system) {
+            system.destroy();
+            this.systems.delete(containerId);
+            console.log('좌표 시스템 제거:', containerId);
+        }
+    },
+
+    /**
+     * 모든 좌표 시스템 정리
+     */
+    destroyAll: function() {
+        this.systems.forEach(function(system, containerId) {
+            system.destroy();
+        });
+        this.systems.clear();
+        console.log('모든 좌표 시스템 정리 완료');
+    }
+};
+
+// ============================================================================
 // 작업공간 관리자 (3단계: 매칭 & 배치)
 // ============================================================================
 var workspaceManager = {
@@ -2650,6 +2721,9 @@ var workspaceManager = {
                 '</div>';
 
             workspaceElement.appendChild(container);
+
+            // 반응형 좌표 시스템 생성
+            this.setupCoordinateSystems();
 
             // 첫 번째 공정이 있으면 자동 선택
             this.selectProcess(appState.processes[0].id);
@@ -3276,6 +3350,35 @@ var workspaceManager = {
         }
 
         return hasAnyPlacements;
+    },
+
+    /**
+     * 반응형 좌표 시스템 설정
+     */
+    setupCoordinateSystems: function() {
+        console.log('좌표 시스템 설정 시작');
+
+        // 미니맵 좌표 시스템 설정
+        coordinateSystemManager.createSystem('minimap-workspace-content', {
+            itemSelector: '.minimap-box',
+            dataPrefix: 'normal'
+        });
+
+        // 장면 이미지 좌표 시스템 설정
+        coordinateSystemManager.createSystem('scene-workspace-content', {
+            itemSelector: '.material-badge',
+            dataPrefix: 'normal'
+        });
+
+        console.log('좌표 시스템 설정 완료');
+    },
+
+    /**
+     * 좌표 시스템 정리
+     */
+    cleanupCoordinateSystems: function() {
+        coordinateSystemManager.destroySystem('minimap-workspace-content');
+        coordinateSystemManager.destroySystem('scene-workspace-content');
     }
 };
 
@@ -3852,6 +3955,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 각 매니저 초기화
         fileUploadManager.init();
         stepController.init();
+        coordinateSystemManager.init();
         workspaceManager.init();
         dragDropManager.init();
 
