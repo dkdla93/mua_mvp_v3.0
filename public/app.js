@@ -391,54 +391,75 @@ var fileUploadManager = {
     },
 
     setupFileInputs: function() {
+        console.log('🔧 setupFileInputs 시작...');
         var self = this;
 
         // 전체 업로드 영역을 클릭 가능하게 설정
         this.setupClickableUploadAreas();
 
         // 엑셀 파일 입력
+        console.log('📊 엑셀 파일 입력 설정...');
         var excelInput = document.getElementById('excel-file');
         if (excelInput) {
+            console.log('✅ 엑셀 파일 입력 요소 발견:', excelInput);
             eventManager.onChange(excelInput, function(e) {
-                console.log('Excel file selected:', e.target.files);
+                console.log('📊 Excel 파일 선택됨:', e.target.files.length, '개');
                 if (e.target.files.length > 0) {
+                    console.log(' - 파일명:', e.target.files[0].name);
+                    console.log(' - 파일크기:', (e.target.files[0].size / (1024*1024)).toFixed(2), 'MB');
+                    console.log('🚀 Excel 파일 처리 시작...');
                     self.handleFiles(e.target.files, 'excel-upload');
                 } else {
-                    console.warn('No excel file selected');
+                    console.warn('⚠️ 엑셀 파일이 선택되지 않음');
                 }
             });
         } else {
-            console.error('엑셀 파일 입력 요소를 찾을 수 없습니다.');
+            console.error('❌ 엑셀 파일 입력 요소를 찾을 수 없습니다.');
         }
 
         // 미니맵 파일 입력
+        console.log('🗺️ 미니맵 파일 입력 설정...');
         var minimapInput = document.getElementById('minimap-file');
         if (minimapInput) {
+            console.log('✅ 미니맵 파일 입력 요소 발견:', minimapInput);
             eventManager.onChange(minimapInput, function(e) {
-                console.log('Minimap file selected:', e.target.files);
+                console.log('🗺️ Minimap 파일 선택됨:', e.target.files.length, '개');
                 if (e.target.files.length > 0) {
+                    console.log(' - 파일명:', e.target.files[0].name);
+                    console.log(' - 파일크기:', (e.target.files[0].size / (1024*1024)).toFixed(2), 'MB');
+                    console.log('🚀 미니맵 파일 처리 시작...');
                     self.handleFiles(e.target.files, 'minimap-upload');
                 } else {
-                    console.warn('No minimap file selected');
+                    console.warn('⚠️ 미니맵 파일이 선택되지 않음');
                 }
             });
         } else {
-            console.error('미니맵 파일 입력 요소를 찾을 수 없습니다.');
+            console.error('❌ 미니맵 파일 입력 요소를 찾을 수 없습니다.');
         }
 
         // 장면 이미지 파일 입력
+        console.log('🏠 장면 파일 입력 설정...');
         var scenesInput = document.getElementById('scenes-files');
         if (scenesInput) {
+            console.log('✅ 장면 파일 입력 요소 발견:', scenesInput);
             eventManager.onChange(scenesInput, function(e) {
-                console.log('Scene files selected:', e.target.files);
+                console.log('🏠 Scene 파일들 선택됨:', e.target.files.length, '개');
                 if (e.target.files.length > 0) {
+                    var totalSize = 0;
+                    for (var i = 0; i < e.target.files.length; i++) {
+                        console.log(' - 파일', (i+1) + ':', e.target.files[i].name,
+                            '(' + (e.target.files[i].size / (1024*1024)).toFixed(2) + 'MB)');
+                        totalSize += e.target.files[i].size;
+                    }
+                    console.log(' - 총 크기:', (totalSize / (1024*1024)).toFixed(2), 'MB');
+                    console.log('🚀 장면 파일들 처리 시작...');
                     self.handleFiles(e.target.files, 'scenes-upload');
                 } else {
-                    console.warn('No scene files selected');
+                    console.warn('⚠️ 장면 파일이 선택되지 않음');
                 }
             });
         } else {
-            console.error('장면 파일 입력 요소를 찾을 수 없습니다.');
+            console.error('❌ 장면 파일 입력 요소를 찾을 수 없습니다.');
         }
 
         // 파일 입력 초기화 (재선택 허용)
@@ -447,40 +468,60 @@ var fileUploadManager = {
 
     // 전체 업로드 영역을 클릭 가능하게 설정
     setupClickableUploadAreas: function() {
+        console.log('setupClickableUploadAreas 시작...');
         var self = this;
         var uploadAreas = document.querySelectorAll('.file-upload-area');
+        console.log('찾은 업로드 영역 개수:', uploadAreas.length);
 
         for (var i = 0; i < uploadAreas.length; i++) {
             var area = uploadAreas[i];
             area.classList.add('clickable');
+            console.log('업로드 영역 설정:', area.id);
 
-            // 클릭 이벤트 추가
-            area.addEventListener('click', function(e) {
-                // 버튼 클릭이 아닌 경우에만 파일 선택 창 열기
+            // 기존 이벤트 리스너 제거 (중복 방지)
+            area.removeEventListener('click', this._boundClickHandler);
+
+            // 클릭 이벤트 핸들러 바인딩
+            this._boundClickHandler = function(e) {
+                console.log('업로드 영역 클릭됨:', this.id, 'target:', e.target);
+
+                // 버튼, 리셋 버튼, 파일 상태 액션 영역이 아닌 경우만 파일 선택
                 if (!e.target.classList.contains('btn') &&
                     !e.target.classList.contains('btn-reset') &&
                     !e.target.closest('.btn') &&
                     !e.target.closest('.file-status-actions')) {
-                    var uploadId = this.id;
-                    var inputId = '';
 
-                    if (uploadId === 'excel-upload') {
-                        inputId = 'excel-file';
-                    } else if (uploadId === 'minimap-upload') {
-                        inputId = 'minimap-file';
-                    } else if (uploadId === 'scenes-upload') {
-                        inputId = 'scenes-files';
-                    }
+                    var uploadId = this.id;
+                    var inputId = self.getInputIdFromUploadId(uploadId);
+                    console.log('파일 선택 시도:', uploadId, '→', inputId);
 
                     if (inputId) {
                         var input = document.getElementById(inputId);
                         if (input) {
+                            console.log('파일 입력 요소 클릭:', input);
                             input.click();
+                        } else {
+                            console.error('파일 입력 요소를 찾을 수 없음:', inputId);
                         }
                     }
+                } else {
+                    console.log('클릭 무시됨 (버튼 또는 액션 영역)');
                 }
-            });
+            };
+
+            area.addEventListener('click', this._boundClickHandler);
         }
+        console.log('setupClickableUploadAreas 완료');
+    },
+
+    // 업로드 ID에서 입력 ID 매핑
+    getInputIdFromUploadId: function(uploadId) {
+        var mapping = {
+            'excel-upload': 'excel-file',
+            'minimap-upload': 'minimap-file',
+            'scenes-upload': 'scenes-files'
+        };
+        return mapping[uploadId] || '';
     },
 
     setupFileInputReset: function() {
@@ -497,29 +538,53 @@ var fileUploadManager = {
     },
 
     handleFiles: function(files, uploadType) {
-        console.log('handleFiles called with:', files, uploadType);
+        console.log('📁 handleFiles 호출됨:', {
+            fileCount: files ? files.length : 0,
+            uploadType: uploadType,
+            files: files
+        });
 
         if (!files || files.length === 0) {
-            console.warn('No files to handle');
+            console.warn('⚠️ 처리할 파일이 없습니다');
             return;
         }
 
-        switch(uploadType) {
-            case 'excel-upload':
-                console.log('Processing Excel file:', files[0].name);
-                this.handleExcelFile(files[0]);
-                break;
-            case 'minimap-upload':
-                console.log('Processing Minimap file:', files[0].name);
-                this.handleMinimapFile(files[0]);
-                break;
-            case 'scenes-upload':
-                console.log('Processing Scene files:', files.length, 'files');
-                this.handleSceneFiles(files);
-                break;
-            default:
-                console.error('Unknown upload type:', uploadType);
+        console.log('🔄 파일 처리 시작:', uploadType);
+
+        try {
+            switch(uploadType) {
+                case 'excel-upload':
+                    console.log('📊 Excel 파일 처리:', files[0].name, '크기:', files[0].size);
+                    this.handleExcelFile(files[0]);
+                    break;
+                case 'minimap-upload':
+                    console.log('🗺️ Minimap 파일 처리:', files[0].name, '크기:', files[0].size);
+                    this.handleMinimapFile(files[0]);
+                    break;
+                case 'scenes-upload':
+                    console.log('🏠 Scene 파일들 처리:', files.length, '개 파일');
+                    this.handleSceneFiles(files);
+                    break;
+                default:
+                    console.error('❌ 알 수 없는 업로드 타입:', uploadType);
+                    this.showFileStatus(this.getStatusIdFromUploadType(uploadType),
+                        '지원하지 않는 파일 타입입니다.', 'error');
+            }
+        } catch (error) {
+            console.error('💥 파일 처리 중 오류 발생:', error);
+            this.showFileStatus(this.getStatusIdFromUploadType(uploadType),
+                '파일 처리 중 오류가 발생했습니다: ' + error.message, 'error');
         }
+    },
+
+    // 업로드 타입에서 상태 ID 매핑
+    getStatusIdFromUploadType: function(uploadType) {
+        var mapping = {
+            'excel-upload': 'excel-status',
+            'minimap-upload': 'minimap-status',
+            'scenes-upload': 'scenes-status'
+        };
+        return mapping[uploadType] || 'unknown-status';
     },
 
     handleExcelFile: function(file) {

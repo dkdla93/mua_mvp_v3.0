@@ -158,10 +158,29 @@ body {
     transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
 }
 
 .file-upload-area.clickable {
     cursor: pointer;
+    border-style: dashed;
+}
+
+.file-upload-area.clickable:hover {
+    border-color: #667eea;
+    background-color: #f8f9ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.file-upload-area.clickable:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.15);
 }
 
 .file-upload-area:hover {
