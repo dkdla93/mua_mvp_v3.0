@@ -1310,43 +1310,91 @@ var stepController = {
     },
 
     goToStep: function(step) {
-        // 이전 단계 비활성화
+        var self = this;
+
+        console.log('🔄 단계 전환:', appState.currentStep, '→', step);
+
+        // 페이지 상단으로 부드럽게 스크롤
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+
+        // 이전 단계 요소들
         var currentStepElement = document.querySelector('.step[data-step="' + appState.currentStep + '"]');
         var currentContentElement = document.getElementById('step-' + appState.currentStep);
 
-        currentStepElement.classList.remove('active');
-        currentStepElement.classList.add('completed');
-        currentContentElement.classList.remove('active');
-
-        // 새 단계 활성화
+        // 새 단계 요소들
         var newStepElement = document.querySelector('.step[data-step="' + step + '"]');
         var newContentElement = document.getElementById('step-' + step);
 
-        newStepElement.classList.add('active');
-        newContentElement.classList.add('active');
-
-        appState.currentStep = step;
-
-        // 단계 변경 이벤트 발생
-        var stepEvent = new CustomEvent('stepChanged', {
-            detail: { step: step, previousStep: appState.currentStep }
-        });
-        document.dispatchEvent(stepEvent);
-
-        // 단계별 초기화 로직
-        switch(step) {
-            case 2:
-                processManager.init();
-                break;
-            case 3:
-                // workspaceManager가 stepChanged 이벤트를 받아서 초기화됨
-                this.checkStep3Completion();
-                break;
-            case 4:
-                // 생성 & 다운로드 단계 초기화
-                this.initStep4();
-                break;
+        // 단계 전환 애니메이션 시작
+        if (currentContentElement) {
+            currentContentElement.classList.add('leaving');
         }
+
+        // 약간의 지연 후 실제 전환 수행
+        setTimeout(function() {
+            // 이전 단계 비활성화
+            if (currentStepElement) {
+                currentStepElement.classList.remove('active');
+                currentStepElement.classList.add('completed');
+            }
+            if (currentContentElement) {
+                currentContentElement.classList.remove('active', 'leaving');
+            }
+
+            // 새 단계 활성화 준비
+            if (newContentElement) {
+                newContentElement.classList.add('entering');
+                newContentElement.classList.add('active');
+            }
+            if (newStepElement) {
+                newStepElement.classList.add('active');
+                // 이전 단계들도 완료 상태로 표시
+                for (var i = 1; i < step; i++) {
+                    var prevStep = document.querySelector('.step[data-step="' + i + '"]');
+                    if (prevStep) {
+                        prevStep.classList.add('completed');
+                    }
+                }
+            }
+
+            // 상태 업데이트
+            appState.currentStep = step;
+
+            // 진입 애니메이션 완료
+            setTimeout(function() {
+                if (newContentElement) {
+                    newContentElement.classList.remove('entering');
+                }
+
+                // 단계 변경 이벤트 발생
+                var stepEvent = new CustomEvent('stepChanged', {
+                    detail: { step: step, previousStep: appState.currentStep }
+                });
+                document.dispatchEvent(stepEvent);
+
+                // 단계별 초기화 로직
+                switch(step) {
+                    case 2:
+                        if (typeof processManager !== 'undefined' && processManager.init) {
+                            processManager.init();
+                        }
+                        break;
+                    case 3:
+                        // workspaceManager가 stepChanged 이벤트를 받아서 초기화됨
+                        self.checkStep3Completion();
+                        break;
+                    case 4:
+                        // 생성 & 다운로드 단계 초기화
+                        self.initStep4();
+                        break;
+                }
+
+                console.log('✅ 단계 전환 완료:', step);
+            }, 100);
+        }, 200);
     },
 
     checkStep1Completion: function() {
