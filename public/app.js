@@ -2506,6 +2506,7 @@ var processManager = {
             // 드래그 중인 요소가 아닌 경우에만 스타일 적용
             if (!this.classList.contains('dragging')) {
                 this.classList.add('drag-over');
+                console.log('📍 드래그오버:', this.getAttribute('data-scene-index'));
             }
         });
 
@@ -2520,9 +2521,18 @@ var processManager = {
             var draggedSceneIndex = parseInt(e.dataTransfer.getData('text/plain'));
             var dropTargetSceneIndex = parseInt(this.getAttribute('data-scene-index'));
 
+            console.log('🎯 드롭 이벤트 발생:', {
+                draggedSceneIndex: draggedSceneIndex,
+                dropTargetSceneIndex: dropTargetSceneIndex,
+                dataTransfer: e.dataTransfer.getData('text/plain'),
+                targetAttribute: this.getAttribute('data-scene-index')
+            });
+
             if (draggedSceneIndex !== dropTargetSceneIndex) {
                 console.log('장면 순서 변경:', draggedSceneIndex, '→', dropTargetSceneIndex);
                 self.reorderScenes(draggedSceneIndex, dropTargetSceneIndex);
+            } else {
+                console.log('❌ 같은 장면으로 드롭 - 순서 변경 안함');
             }
         });
     },
@@ -3366,6 +3376,10 @@ var workspaceManager = {
         // 마우스 다운 - 드래그 시작
         minimapContainer.addEventListener('mousedown', function(e) {
             if (e.target.classList.contains('minimap-image')) {
+                // 이벤트 전파 및 기본 동작 즉시 차단
+                e.preventDefault();
+                e.stopPropagation();
+
                 isDrawing = true;
 
                 var rect = minimapContainer.getBoundingClientRect();
@@ -3383,7 +3397,6 @@ var workspaceManager = {
                 overlaysContainer.appendChild(currentBox);
 
                 console.log('빨간박스 그리기 시작:', startX, startY);
-                e.preventDefault();
             }
         });
 
