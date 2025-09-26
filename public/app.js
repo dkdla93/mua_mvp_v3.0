@@ -3113,27 +3113,25 @@ var workspaceManager = {
             var html = '<div class="minimap-container" style="position: relative; display: inline-block;">';
             html += '<img src="' + appState.minimapImage + '" alt="미니맵" class="minimap-image" style="max-width: 100%; height: auto;">';
 
-            // 선택된 장면들에 대해 빨간 박스 표시
+            // 현재 활성 장면에 대해서만 빨간 박스 표시 (첫 번째 장면)
             if (process.selectedScenes && process.selectedScenes.length > 0) {
                 html += '<div class="minimap-overlays" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">';
 
-                for (var i = 0; i < process.selectedScenes.length; i++) {
-                    var sceneIndex = process.selectedScenes[i];
-                    var sceneData = appState.sceneImages[sceneIndex];
+                // 첫 번째 선택된 장면만 표시
+                var sceneIndex = process.selectedScenes[0];
+                var sceneData = appState.sceneImages[sceneIndex];
 
-                    if (sceneData) {
-                        // 각 장면에 대해 빨간 박스 생성 (임시로 랜덤 위치)
-                        // 실제로는 장면과 미니맵의 매핑 정보가 필요
-                        var boxStyle = this.generateSceneBox(i, process.selectedScenes.length);
-                        html += '<div class="scene-box" data-scene-index="' + sceneIndex + '" ';
-                        html += 'style="position: absolute; border: 2px solid #ff4444; background: rgba(255, 68, 68, 0.2); ';
-                        html += boxStyle + 'cursor: pointer;" ';
-                        html += 'title="' + sceneData.name + '">';
-                        html += '<span style="position: absolute; top: -20px; left: 2px; background: #ff4444; color: white; padding: 2px 6px; font-size: 12px; border-radius: 3px;">';
-                        html += (i + 1);
-                        html += '</span>';
-                        html += '</div>';
-                    }
+                if (sceneData) {
+                    // 현재 활성 장면에 대해 빨간 박스 생성
+                    var boxStyle = this.generateSceneBox(0, 1);
+                    html += '<div class="scene-box active-scene" data-scene-index="' + sceneIndex + '" ';
+                    html += 'style="position: absolute; border: 3px solid #ff4444; background: rgba(255, 68, 68, 0.3); ';
+                    html += boxStyle + 'cursor: pointer;" ';
+                    html += 'title="현재 활성 장면: ' + sceneData.name + '">';
+                    html += '<span style="position: absolute; top: -25px; left: 2px; background: #ff4444; color: white; padding: 3px 8px; font-size: 12px; border-radius: 3px; font-weight: bold;">';
+                    html += '활성';
+                    html += '</span>';
+                    html += '</div>';
                 }
 
                 html += '</div>';
@@ -3141,23 +3139,31 @@ var workspaceManager = {
 
             html += '</div>';
 
-            // 범례 추가
+            // 범례 추가 - 현재 활성 장면 정보
             html += '<div class="minimap-legend" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">';
-            html += '<h4 style="margin: 0 0 8px 0; font-size: 14px;">선택된 장면</h4>';
+            html += '<h4 style="margin: 0 0 8px 0; font-size: 14px;">현재 활성 장면</h4>';
 
             if (process.selectedScenes && process.selectedScenes.length > 0) {
-                for (var i = 0; i < process.selectedScenes.length; i++) {
-                    var sceneIndex = process.selectedScenes[i];
-                    var sceneData = appState.sceneImages[sceneIndex];
+                // 첫 번째 장면만 표시
+                var sceneIndex = process.selectedScenes[0];
+                var sceneData = appState.sceneImages[sceneIndex];
 
-                    if (sceneData) {
-                        html += '<div style="display: flex; align-items: center; margin-bottom: 4px;">';
-                        html += '<span style="display: inline-block; width: 20px; height: 20px; background: #ff4444; margin-right: 8px; text-align: center; color: white; font-size: 12px; line-height: 20px; border-radius: 2px;">';
-                        html += (i + 1);
-                        html += '</span>';
-                        html += '<span style="font-size: 13px;">' + sceneData.name + '</span>';
-                        html += '</div>';
+                if (sceneData) {
+                    html += '<div style="display: flex; align-items: center; margin-bottom: 4px;">';
+                    html += '<span style="display: inline-block; width: 24px; height: 20px; background: #ff4444; margin-right: 8px; text-align: center; color: white; font-size: 11px; line-height: 20px; border-radius: 2px; font-weight: bold;">';
+                    html += '활성';
+                    html += '</span>';
+                    html += '<span style="font-size: 13px; font-weight: 500;">' + sceneData.name + '</span>';
+                    html += '</div>';
+
+                    // 전체 장면 개수 정보
+                    if (process.selectedScenes.length > 1) {
+                        html += '<p style="margin: 8px 0 0 0; color: #666; font-size: 12px;">';
+                        html += '총 ' + process.selectedScenes.length + '개 장면 중 1번째 표시';
+                        html += '</p>';
                     }
+                } else {
+                    html += '<p style="margin: 0; color: #666; font-size: 13px;">장면 데이터를 찾을 수 없습니다.</p>';
                 }
             } else {
                 html += '<p style="margin: 0; color: #666; font-size: 13px;">선택된 장면이 없습니다.</p>';
