@@ -1297,10 +1297,11 @@ var stepController = {
         if (generatePptBtn) {
             generatePptBtn.addEventListener('click', function() {
                 console.log('PPT 생성 시작');
-                if (typeof pptGenerator !== 'undefined') {
-                    pptGenerator.generatePPT();
+                if (typeof stepController !== 'undefined' && stepController.generatePPT) {
+                    stepController.generatePPT();
                 } else {
-                    console.error('pptGenerator를 찾을 수 없습니다');
+                    console.error('PPT 생성 기능을 찾을 수 없습니다');
+                    utils.showError('PPT 생성 기능이 초기화되지 않았습니다. 페이지를 새로고침해 주세요.');
                 }
             });
         }
