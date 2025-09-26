@@ -2005,36 +2005,62 @@ var workspaceManager = {
 
     // 3단계 진입 시 작업공간 구성
     setupWorkspace: function() {
-        var workspaceElement = document.getElementById('workspace');
-        if (!workspaceElement) {
-            console.error('작업공간 엘리먼트를 찾을 수 없습니다.');
-            return;
-        }
+        console.log('workspaceManager.setupWorkspace 시작');
 
-        // 기존 내용 제거
-        workspaceElement.innerHTML = '';
+        try {
+            var workspaceElement = document.getElementById('workspace');
+            if (!workspaceElement) {
+                console.error('작업공간 엘리먼트를 찾을 수 없습니다.');
+                utils.showError('작업공간을 초기화할 수 없습니다.\n페이지를 새로고침해주세요.');
+                return;
+            }
 
-        // 공정 선택 드롭다운 생성
-        this.renderProcessSelector(workspaceElement);
+            // 데이터 유효성 검사
+            if (!appState.processes || appState.processes.length === 0) {
+                utils.showError('공정 데이터가 없습니다.\n2단계에서 공정을 먼저 설정해주세요.');
+                return;
+            }
 
-        // 작업공간 컨테이너 생성
-        var container = document.createElement('div');
-        container.className = 'workspace-container';
-        container.innerHTML =
-            '<div class="scene-workspace" id="scene-workspace">' +
-                '<h3>장면 이미지</h3>' +
-                '<div id="scene-workspace-content"></div>' +
-            '</div>' +
-            '<div class="material-workspace" id="material-workspace">' +
-                '<h3>자재표</h3>' +
-                '<div id="material-workspace-content"></div>' +
-            '</div>';
+            if (!appState.sceneImages || appState.sceneImages.length === 0) {
+                utils.showError('장면 이미지가 없습니다.\n1단계에서 이미지를 먼저 업로드해주세요.');
+                return;
+            }
 
-        workspaceElement.appendChild(container);
+            console.log('데이터 상태:', {
+                processes: appState.processes.length,
+                sceneImages: appState.sceneImages.length,
+                materialData: appState.materialData ? appState.materialData.length : 0
+            });
 
-        // 첫 번째 공정이 있으면 자동 선택
-        if (appState.processes && appState.processes.length > 0) {
+            // 기존 내용 제거
+            workspaceElement.innerHTML = '';
+
+            // 공정 선택 드롭다운 생성
+            this.renderProcessSelector(workspaceElement);
+
+            // 작업공간 컨테이너 생성
+            var container = document.createElement('div');
+            container.className = 'workspace-container';
+            container.innerHTML =
+                '<div class="scene-workspace" id="scene-workspace">' +
+                    '<h3>장면 이미지</h3>' +
+                    '<div id="scene-workspace-content"></div>' +
+                '</div>' +
+                '<div class="material-workspace" id="material-workspace">' +
+                    '<h3>자재표</h3>' +
+                    '<div id="material-workspace-content"></div>' +
+                '</div>';
+
+            workspaceElement.appendChild(container);
+
+            // 첫 번째 공정이 있으면 자동 선택
             this.selectProcess(appState.processes[0].id);
+
+            console.log('workspaceManager.setupWorkspace 완료');
+
+        } catch (error) {
+            console.error('workspaceManager.setupWorkspace 오류:', error);
+            utils.showError('작업공간 초기화 중 오류가 발생했습니다:\n' + error.message);
         }
     },
 
@@ -2098,32 +2124,63 @@ var workspaceManager = {
 
     // 장면 작업공간 렌더링
     renderSceneWorkspace: function(process) {
-        var contentElement = document.getElementById('scene-workspace-content');
-        if (!contentElement) return;
+        console.log('renderSceneWorkspace 시작:', process);
 
-        if (!process.selectedScenes || process.selectedScenes.length === 0) {
-            contentElement.innerHTML = '<p class="empty-state">선택된 장면이 없습니다.</p>';
-            return;
-        }
+        try {
+            var contentElement = document.getElementById('scene-workspace-content');
+            if (!contentElement) {
+                console.error('scene-workspace-content 엘리먼트를 찾을 수 없습니다.');
+                return;
+            }
 
-        var html = '<div class="scene-workspace-grid">';
+            if (!process.selectedScenes || process.selectedScenes.length === 0) {
+                contentElement.innerHTML = '<p class="empty-state">선택된 장면이 없습니다.</p>';
+                console.log('선택된 장면이 없음');
+                return;
+            }
 
-        for (var i = 0; i < process.selectedScenes.length; i++) {
-            var sceneId = process.selectedScenes[i];
-            var sceneData = appState.sceneData.find(function(s) { return s.id === sceneId; });
+            console.log('선택된 장면들:', process.selectedScenes);
+            console.log('전체 장면 이미지 수:', appState.sceneImages.length);
 
-            if (sceneData) {
-                html += this.renderSceneWorkspaceItem(sceneData);
+            var html = '<div class="scene-workspace-grid">';
+
+            for (var i = 0; i < process.selectedScenes.length; i++) {
+                var sceneIndex = process.selectedScenes[i];
+                var sceneData = appState.sceneImages[sceneIndex];
+
+                console.log('장면', i, ':', { sceneIndex: sceneIndex, sceneData: sceneData });
+
+                if (sceneData) {
+                    // 장면 데이터를 workspaceManager에서 사용할 수 있도록 변환
+                    var workspaceSceneData = {
+                        id: sceneIndex,  // 인덱스를 ID로 사용
+                        name: sceneData.name,
+                        url: sceneData.data  // data 속성을 url로 매핑
+                    };
+                    html += this.renderSceneWorkspaceItem(workspaceSceneData);
+                } else {
+                    console.warn('장면 데이터가 없음:', sceneIndex);
+                }
+            }
+
+            html += '</div>';
+            contentElement.innerHTML = html;
+
+            console.log('장면 작업공간 HTML 설정 완료');
+
+            // 드롭 타겟 설정
+            setTimeout(function() {
+                dragDropManager.setupSceneDropTargets();
+                console.log('드롭 타겟 설정 완료');
+            }, 100);
+
+        } catch (error) {
+            console.error('renderSceneWorkspace 오류:', error);
+            var contentElement = document.getElementById('scene-workspace-content');
+            if (contentElement) {
+                contentElement.innerHTML = '<p class="empty-state">장면을 표시하는 중 오류가 발생했습니다.</p>';
             }
         }
-
-        html += '</div>';
-        contentElement.innerHTML = html;
-
-        // 드롭 타겟 설정
-        setTimeout(function() {
-            dragDropManager.setupSceneDropTargets();
-        }, 100);
     },
 
     // 개별 장면 작업공간 아이템 렌더링
