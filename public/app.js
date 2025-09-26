@@ -70,6 +70,7 @@ var appState = new Proxy({}, {
         'nextPositionNumber': 1,
         'sceneMaterialMapping.process_1': {},
         'sceneMaterialPositions.process_1': {},
+        'sceneMaterialAssignments.process_1': {}, // 자재-장면 매칭 상태 저장
         'minimapBoxes.process_1': {},
         'sceneImages': [],
         'excelData': null,
@@ -3801,7 +3802,10 @@ var workspaceManager = {
             console.log('자재 데이터 확인:', appState.materials.length, '개 자재');
 
             var html = '<div class="material-table-container">';
-            html += '<p class="drag-instruction">자재를 클릭하고 드래그하여 장면 이미지에 배치하세요.</p>';
+            html += '<p class="drag-instruction">' +
+                   '<strong>1단계:</strong> 현재 장면에 필요한 자재들을 체크박스로 선택하세요.<br>' +
+                   '<strong>2단계:</strong> 매칭된 자재들을 드래그하여 장면 이미지에 위치를 지정하세요.' +
+                   '</p>';
 
             // 자재 탭 생성
             if (appState.materialsBySheet && Object.keys(appState.materialsBySheet).length > 0) {
@@ -3824,7 +3828,7 @@ var workspaceManager = {
             html += '<div class="material-table-content" id="material-table-content">';
             html += '<table class="material-table" id="material-table">';
             html += '<thead><tr>';
-            html += '<th>번호</th><th>분류</th><th>자재명</th><th>세부내용</th>';
+            html += '<th>선택</th><th>번호</th><th>분류</th><th>자재명</th><th>세부내용</th>';
             html += '</tr></thead><tbody id="material-table-body">';
             html += '</tbody></table>';
             html += '</div>';
@@ -3894,12 +3898,34 @@ var workspaceManager = {
             materialsToShow = appState.materialsBySheet[sheetName];
         }
 
+        // 현재 공정 및 활성 장면 정보 가져오기
+        var currentProcess = this.getCurrentProcess();
+        var activeSceneIndex = this.getActiveSceneIndex();
+
         var html = '';
         for (var i = 0; i < materialsToShow.length; i++) {
             var material = materialsToShow[i];
             var globalIndex = appState.materials.indexOf(material);
 
-            html += '<tr data-material-index="' + globalIndex + '">';
+            // 현재 장면에 이 자재가 매칭되었는지 확인
+            var isAssigned = this.isMaterialAssignedToScene(globalIndex, activeSceneIndex, currentProcess?.id);
+            var isAssignable = activeSceneIndex !== null; // 활성 장면이 있어야 매칭 가능
+
+            html += '<tr data-material-index="' + globalIndex + '" class="' +
+                   (isAssigned ? 'material-assigned' : '') +
+                   (!isAssignable ? ' material-disabled' : '') + '">';
+
+            // 매칭 체크박스 추가
+            html += '<td class="material-select-col">';
+            if (isAssignable) {
+                html += '<input type="checkbox" class="material-assign-checkbox" ' +
+                       'data-material-index="' + globalIndex + '" ' +
+                       (isAssigned ? 'checked' : '') + '>';
+            } else {
+                html += '<span class="material-no-scene">-</span>';
+            }
+            html += '</td>';
+
             html += '<td>' + (material.id || i + 1) + '</td>';
             html += '<td>' + (material.category || '일반') + '</td>';
             html += '<td>' + (material.material || material.displayId || '자재 ' + (i + 1)) + '</td>';
@@ -3909,10 +3935,117 @@ var workspaceManager = {
 
         tableBody.innerHTML = html;
 
+        // 자재 매칭 체크박스 이벤트 바인딩
+        this.bindMaterialAssignEvents();
+
         // 드래그 소스 재설정
         setTimeout(function() {
             dragDropManager.setupMaterialDragSources();
         }, 100);
+    },
+
+    // 현재 공정 가져오기
+    getCurrentProcess: function() {
+        var currentProcessId = appState.currentProcess || 'process_1';
+        return appState.processes ? appState.processes.find(function(p) { return p.id === currentProcessId; }) : null;
+    },
+
+    // 현재 활성 장면 인덱스 가져오기
+    getActiveSceneIndex: function() {
+        var currentProcess = this.getCurrentProcess();
+        if (!currentProcess) return null;
+
+        // 3단계에서 선택된 활성 장면이 있으면 그것 사용, 없으면 첫 번째 선택 장면
+        if (currentProcess.activeSceneStep3 !== undefined) {
+            return currentProcess.activeSceneStep3;
+        }
+        if (currentProcess.selectedScenes && currentProcess.selectedScenes.length > 0) {
+            return currentProcess.selectedScenes[0];
+        }
+        return null;
+    },
+
+    // 자재가 특정 장면에 할당되었는지 확인
+    isMaterialAssignedToScene: function(materialIndex, sceneIndex, processId) {
+        if (sceneIndex === null || !processId) return false;
+
+        var assignments = stateManager.getState('sceneMaterialAssignments.' + processId) || {};
+        var sceneAssignments = assignments[sceneIndex] || [];
+        return sceneAssignments.indexOf(materialIndex) !== -1;
+    },
+
+    // 자재 매칭 체크박스 이벤트 바인딩
+    bindMaterialAssignEvents: function() {
+        var self = this;
+        var checkboxes = document.querySelectorAll('.material-assign-checkbox');
+
+        for (var i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].addEventListener('change', function() {
+                var materialIndex = parseInt(this.getAttribute('data-material-index'));
+                var isChecked = this.checked;
+
+                self.toggleMaterialAssignment(materialIndex, isChecked);
+            });
+        }
+    },
+
+    // 자재 매칭 토글
+    toggleMaterialAssignment: function(materialIndex, isAssigned) {
+        var currentProcess = this.getCurrentProcess();
+        var activeSceneIndex = this.getActiveSceneIndex();
+
+        if (!currentProcess || activeSceneIndex === null) {
+            console.error('현재 공정 또는 활성 장면을 찾을 수 없습니다.');
+            return;
+        }
+
+        var assignmentsKey = 'sceneMaterialAssignments.' + currentProcess.id;
+        var assignments = stateManager.getState(assignmentsKey) || {};
+
+        if (!assignments[activeSceneIndex]) {
+            assignments[activeSceneIndex] = [];
+        }
+
+        var sceneAssignments = assignments[activeSceneIndex];
+        var materialIndexInScene = sceneAssignments.indexOf(materialIndex);
+
+        if (isAssigned && materialIndexInScene === -1) {
+            // 자재 추가
+            sceneAssignments.push(materialIndex);
+            console.log('✅ 자재 ' + materialIndex + ' → 장면 ' + activeSceneIndex + ' 매칭');
+        } else if (!isAssigned && materialIndexInScene !== -1) {
+            // 자재 제거
+            sceneAssignments.splice(materialIndexInScene, 1);
+            console.log('❌ 자재 ' + materialIndex + ' → 장면 ' + activeSceneIndex + ' 매칭 해제');
+        }
+
+        assignments[activeSceneIndex] = sceneAssignments;
+        stateManager.updateState(assignmentsKey, assignments);
+
+        // UI 업데이트
+        this.updateMaterialRowVisuals();
+
+        // 드래그 소스 재설정 (매칭 상태가 변경되었으므로)
+        setTimeout(function() {
+            dragDropManager.setupMaterialDragSources();
+        }, 100);
+    },
+
+    // 자재 행 시각적 업데이트
+    updateMaterialRowVisuals: function() {
+        var materialRows = document.querySelectorAll('#material-table tbody tr');
+
+        for (var i = 0; i < materialRows.length; i++) {
+            var row = materialRows[i];
+            var materialIndex = parseInt(row.getAttribute('data-material-index'));
+            var checkbox = row.querySelector('.material-assign-checkbox');
+
+            if (checkbox && checkbox.checked) {
+                row.classList.add('material-assigned');
+            } else {
+                row.classList.remove('material-assigned');
+            }
+        }
     },
 
     // 작업공간 초기화
@@ -4041,8 +4174,24 @@ var dragDropManager = {
 
         for (var i = 0; i < materialRows.length; i++) {
             var row = materialRows[i];
-            this.makeMaterialRowDraggable(row, i);
+            var materialIndex = parseInt(row.getAttribute('data-material-index'));
+
+            // 매칭된 자재만 드래그 가능하도록 설정
+            if (this.isMaterialAssignedToCurrentScene(materialIndex)) {
+                this.makeMaterialRowDraggable(row, materialIndex);
+            } else {
+                this.makeMaterialRowNonDraggable(row);
+            }
         }
+    },
+
+    // 자재가 현재 활성 장면에 매칭되었는지 확인
+    isMaterialAssignedToCurrentScene: function(materialIndex) {
+        return workspaceManager.isMaterialAssignedToScene(
+            materialIndex,
+            workspaceManager.getActiveSceneIndex(),
+            workspaceManager.getCurrentProcess()?.id
+        );
     },
 
     makeMaterialRowDraggable: function(row, materialIndex) {
@@ -4097,6 +4246,36 @@ var dragDropManager = {
 
         row.addEventListener('mouseleave', function() {
             row.style.backgroundColor = '';
+        });
+    },
+
+    // 자재 행을 드래그 불가능하게 설정
+    makeMaterialRowNonDraggable: function(row) {
+        // 드래그 비활성화
+        row.draggable = false;
+        row.style.cursor = 'not-allowed';
+
+        // 기존 이벤트 리스너 제거 (새로운 클론으로 교체)
+        var newRow = row.cloneNode(true);
+        row.parentNode.replaceChild(newRow, row);
+
+        // 비활성 상태 스타일 적용
+        newRow.classList.add('material-drag-disabled');
+        newRow.style.opacity = '0.5';
+
+        // 클릭 시 안내 메시지
+        newRow.addEventListener('click', function(e) {
+            e.preventDefault();
+            alert('이 자재를 드래그하려면 먼저 현재 장면에 매칭해주세요.');
+        });
+
+        // 호버 효과 (비활성 상태)
+        newRow.addEventListener('mouseenter', function() {
+            newRow.style.backgroundColor = '#f5f5f5';
+        });
+
+        newRow.addEventListener('mouseleave', function() {
+            newRow.style.backgroundColor = '';
         });
     },
 
