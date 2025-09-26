@@ -354,11 +354,40 @@
                     lightState.files.minimap = 'stored';
                 }
 
-                if (lightState.files.scenes && lightState.files.scenes.length > 0) {
+                // scenes가 배열인지 확인 후 처리
+                if (lightState.files.scenes && Array.isArray(lightState.files.scenes) && lightState.files.scenes.length > 0) {
                     lightState.files.scenes = lightState.files.scenes.map(function() {
                         return 'stored';
                     });
+                } else if (lightState.files.scenes && typeof lightState.files.scenes === 'string') {
+                    // 이미 문자열로 저장된 경우 그대로 유지
+                    lightState.files.scenes = 'stored';
                 }
+            }
+
+            // sceneImages 경량화 (현재 세션 이미지는 localStorage에 저장 안함)
+            if (lightState.sceneImages && Array.isArray(lightState.sceneImages) && lightState.sceneImages.length > 0) {
+                lightState.sceneImages = lightState.sceneImages.map(function(scene) {
+                    // 현재 세션 이미지는 localStorage에 저장하지 않고 메타데이터만 보존
+                    if (scene.isCurrentSession) {
+                        console.log('StateManager: 현재 세션 이미지 메타데이터만 저장:', scene.name);
+                        return {
+                            name: scene.name,
+                            index: scene.index,
+                            data: 'current_session_stored', // 현재 세션 데이터는 메모리에만 존재
+                            isCurrentSession: true,
+                            width: scene.width,
+                            height: scene.height,
+                            size: scene.size
+                        };
+                    } else {
+                        return {
+                            name: scene.name,
+                            index: scene.index,
+                            data: 'light_stored' // 경량화된 상태임을 표시
+                        };
+                    }
+                });
             }
 
             return lightState;
@@ -368,6 +397,33 @@
          * 최소화된 상태 생성 (핵심 데이터만)
          */
         createMinimalState: function() {
+            // 장면 이미지 메타데이터만 유지 (현재 세션 이미지도 localStorage에 저장 안함)
+            var sceneImagesMetadata = [];
+            if (this.state.sceneImages && this.state.sceneImages.length > 0) {
+                for (var i = 0; i < this.state.sceneImages.length; i++) {
+                    var scene = this.state.sceneImages[i];
+                    // 현재 세션 이미지도 메타데이터만 저장
+                    if (scene.isCurrentSession) {
+                        console.log('StateManager: 현재 세션 이미지 메타데이터만 저장 (minimal):', scene.name);
+                        sceneImagesMetadata.push({
+                            name: scene.name,
+                            index: scene.index,
+                            data: 'current_session_stored', // 현재 세션 데이터는 메모리에만 존재
+                            isCurrentSession: true,
+                            width: scene.width,
+                            height: scene.height,
+                            size: scene.size
+                        });
+                    } else {
+                        sceneImagesMetadata.push({
+                            name: scene.name,
+                            index: scene.index,
+                            data: 'minimal_stored' // 데이터 없이 플래그만
+                        });
+                    }
+                }
+            }
+
             return {
                 processes: this.state.processes,
                 currentProcess: this.state.currentProcess,
@@ -376,6 +432,14 @@
                 minimapBoxes: this.state.minimapBoxes,
                 currentStep: this.state.currentStep,
                 nextPositionNumber: this.state.nextPositionNumber,
+                sceneImages: sceneImagesMetadata, // 메타데이터만 보존
+                // 파일 구조도 기본적으로 유지 (데이터 없이)
+                files: {
+                    excel: this.state.files && this.state.files.excel ? 'minimal_stored' : null,
+                    minimap: this.state.files && this.state.files.minimap ? 'minimal_stored' : null,
+                    scenes: sceneImagesMetadata.length > 0 ? 'minimal_stored' : []
+                },
+                materials: this.state.materials || [], // 자재 데이터는 보존
                 metadata: {
                     version: this.state.metadata.version,
                     lastModifiedAt: new Date().toISOString(),
@@ -390,7 +454,19 @@
          */
         mergeWithInitialState: function(savedState) {
             var initialState = this.getInitialState();
-            return this.deepMerge(initialState, savedState);
+            var merged = this.deepMerge(initialState, savedState);
+
+            // sceneImages 데이터 처리
+            if (savedState.sceneImages && Array.isArray(savedState.sceneImages) && savedState.sceneImages.length > 0) {
+                // 현재 세션 이미지는 메타데이터만 복원 (실제 데이터는 sessionImageCache에서 가져옴)
+                merged.sceneImages = savedState.sceneImages; // 메타데이터 그대로 사용
+                console.log('StateManager: sceneImages 메타데이터 복원 완료:', savedState.sceneImages.length + '개');
+            } else {
+                console.log('StateManager: sceneImages가 없거나 빈 배열');
+                merged.sceneImages = []; // 빈 배열로 초기화
+            }
+
+            return merged;
         },
 
         /**

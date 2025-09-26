@@ -5,6 +5,9 @@
 
 'use strict';
 
+// 현재 세션의 이미지 데이터를 메모리에 저장 (localStorage에 저장하지 않음)
+var sessionImageCache = {};
+
 // 전역 애플리케이션 상태 - StateManager 기반으로 업그레이드
 // 호환성을 위한 Proxy 객체 생성
 var appState = new Proxy({}, {
@@ -67,7 +70,14 @@ var appState = new Proxy({}, {
         'nextPositionNumber': 1,
         'sceneMaterialMapping.process_1': {},
         'sceneMaterialPositions.process_1': {},
-        'minimapBoxes.process_1': {}
+        'minimapBoxes.process_1': {},
+        'sceneImages': [],
+        'excelData': null,
+        'materials': [],
+        'minimapImage': null,
+        'allSheets': {},
+        'materialsBySheet': {},
+        'currentSheet': null
     };
 
     Object.keys(defaultValues).forEach(function(key) {
@@ -342,9 +352,78 @@ var fileUploadManager = {
     },
 
     init: function() {
-        this.setupDragAndDrop();
-        this.setupFileInputs();
-        this.setupProgressTracking();
+        console.log('📋 fileUploadManager.init() 시작...');
+
+        try {
+            // DOM이 준비되었는지 확인 (경고만 출력, 오류 던지지 않음)
+            var domReady = this.checkDOMReady();
+            if (!domReady) {
+                console.warn('⚠️ 일부 DOM 요소가 준비되지 않았지만 초기화를 계속합니다.');
+            }
+
+            // 각 단계별 초기화 (개별 try-catch로 부분 실패 허용)
+            this.setupProgressTracking();
+            this.setupDragAndDrop();
+            this.setupFileInputs();
+
+            console.log('✅ fileUploadManager 초기화 완료');
+        } catch (error) {
+            console.error('💥 fileUploadManager 초기화 중 치명적 오류:', error);
+            // 기본 파일 업로드만이라도 설정
+            this.setupBasicFileUpload();
+        }
+    },
+
+    // DOM 준비 상태 확인 (오류 대신 true/false 반환)
+    checkDOMReady: function() {
+        console.log('🔍 DOM 준비 상태 확인...');
+
+        var requiredElements = [
+            'excel-upload', 'minimap-upload', 'scenes-upload',
+            'excel-file', 'minimap-file', 'scenes-files'
+        ];
+
+        var missingElements = [];
+
+        for (var i = 0; i < requiredElements.length; i++) {
+            var element = document.getElementById(requiredElements[i]);
+            if (!element) {
+                missingElements.push(requiredElements[i]);
+            }
+        }
+
+        if (missingElements.length > 0) {
+            console.warn('⚠️ 일부 DOM 요소 누락:', missingElements);
+            return false;
+        }
+
+        console.log('✅ 모든 필수 DOM 요소 확인됨');
+        return true;
+    },
+
+    // 기본 파일 업로드 기능 (폴백용)
+    setupBasicFileUpload: function() {
+        console.log('🔧 기본 파일 업로드 설정...');
+
+        var fileInputs = [
+            { id: 'excel-file', name: '엑셀 파일' },
+            { id: 'minimap-file', name: '미니맵 파일' },
+            { id: 'scenes-files', name: '장면 파일들' }
+        ];
+
+        for (var i = 0; i < fileInputs.length; i++) {
+            var input = document.getElementById(fileInputs[i].id);
+            if (input) {
+                console.log('📁 기본 파일 입력 설정:', fileInputs[i].name);
+                input.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        console.log('✅ 파일 선택됨:', e.target.files[0].name);
+                    }
+                });
+            }
+        }
+
+        console.log('✅ 기본 파일 업로드 설정 완료');
     },
 
     setupDragAndDrop: function() {
@@ -394,124 +473,175 @@ var fileUploadManager = {
         console.log('🔧 setupFileInputs 시작...');
         var self = this;
 
-        // 전체 업로드 영역을 클릭 가능하게 설정
-        this.setupClickableUploadAreas();
-
-        // 엑셀 파일 입력
-        console.log('📊 엑셀 파일 입력 설정...');
-        var excelInput = document.getElementById('excel-file');
-        if (excelInput) {
-            console.log('✅ 엑셀 파일 입력 요소 발견:', excelInput);
-            eventManager.onChange(excelInput, function(e) {
-                console.log('📊 Excel 파일 선택됨:', e.target.files.length, '개');
-                if (e.target.files.length > 0) {
-                    console.log(' - 파일명:', e.target.files[0].name);
-                    console.log(' - 파일크기:', (e.target.files[0].size / (1024*1024)).toFixed(2), 'MB');
-                    console.log('🚀 Excel 파일 처리 시작...');
-                    self.handleFiles(e.target.files, 'excel-upload');
-                } else {
-                    console.warn('⚠️ 엑셀 파일이 선택되지 않음');
-                }
-            });
-        } else {
-            console.error('❌ 엑셀 파일 입력 요소를 찾을 수 없습니다.');
+        // 전체 업로드 영역을 클릭 가능하게 설정 (안전하게)
+        try {
+            this.setupClickableUploadAreas();
+        } catch (error) {
+            console.error('❌ 클릭 가능한 영역 설정 실패:', error);
         }
 
-        // 미니맵 파일 입력
-        console.log('🗺️ 미니맵 파일 입력 설정...');
-        var minimapInput = document.getElementById('minimap-file');
-        if (minimapInput) {
-            console.log('✅ 미니맵 파일 입력 요소 발견:', minimapInput);
-            eventManager.onChange(minimapInput, function(e) {
-                console.log('🗺️ Minimap 파일 선택됨:', e.target.files.length, '개');
-                if (e.target.files.length > 0) {
-                    console.log(' - 파일명:', e.target.files[0].name);
-                    console.log(' - 파일크기:', (e.target.files[0].size / (1024*1024)).toFixed(2), 'MB');
-                    console.log('🚀 미니맵 파일 처리 시작...');
-                    self.handleFiles(e.target.files, 'minimap-upload');
-                } else {
-                    console.warn('⚠️ 미니맵 파일이 선택되지 않음');
-                }
-            });
-        } else {
-            console.error('❌ 미니맵 파일 입력 요소를 찾을 수 없습니다.');
-        }
-
-        // 장면 이미지 파일 입력
-        console.log('🏠 장면 파일 입력 설정...');
-        var scenesInput = document.getElementById('scenes-files');
-        if (scenesInput) {
-            console.log('✅ 장면 파일 입력 요소 발견:', scenesInput);
-            eventManager.onChange(scenesInput, function(e) {
-                console.log('🏠 Scene 파일들 선택됨:', e.target.files.length, '개');
-                if (e.target.files.length > 0) {
-                    var totalSize = 0;
-                    for (var i = 0; i < e.target.files.length; i++) {
-                        console.log(' - 파일', (i+1) + ':', e.target.files[i].name,
-                            '(' + (e.target.files[i].size / (1024*1024)).toFixed(2) + 'MB)');
-                        totalSize += e.target.files[i].size;
+        // 엑셀 파일 입력 - 기본 addEventListener 사용
+        try {
+            console.log('📊 엑셀 파일 입력 설정...');
+            var excelInput = document.getElementById('excel-file');
+            if (excelInput) {
+                console.log('✅ 엑셀 파일 입력 요소 발견:', excelInput);
+                excelInput.addEventListener('change', function(e) {
+                    console.log('📊 Excel 파일 선택됨:', e.target.files.length, '개');
+                    if (e.target.files.length > 0) {
+                        console.log(' - 파일명:', e.target.files[0].name);
+                        console.log(' - 파일크기:', (e.target.files[0].size / (1024*1024)).toFixed(2), 'MB');
+                        console.log('🚀 Excel 파일 처리 시작...');
+                        self.handleFiles(e.target.files, 'excel-upload');
+                    } else {
+                        console.warn('⚠️ 엑셀 파일이 선택되지 않음');
                     }
-                    console.log(' - 총 크기:', (totalSize / (1024*1024)).toFixed(2), 'MB');
-                    console.log('🚀 장면 파일들 처리 시작...');
-                    self.handleFiles(e.target.files, 'scenes-upload');
-                } else {
-                    console.warn('⚠️ 장면 파일이 선택되지 않음');
-                }
-            });
-        } else {
-            console.error('❌ 장면 파일 입력 요소를 찾을 수 없습니다.');
+                });
+            } else {
+                console.error('❌ 엑셀 파일 입력 요소를 찾을 수 없습니다.');
+            }
+        } catch (error) {
+            console.error('❌ 엑셀 파일 입력 설정 실패:', error);
+        }
+
+        // 미니맵 파일 입력 - 기본 addEventListener 사용
+        try {
+            console.log('🗺️ 미니맵 파일 입력 설정...');
+            var minimapInput = document.getElementById('minimap-file');
+            if (minimapInput) {
+                console.log('✅ 미니맵 파일 입력 요소 발견:', minimapInput);
+                minimapInput.addEventListener('change', function(e) {
+                    console.log('🗺️ Minimap 파일 선택됨:', e.target.files.length, '개');
+                    if (e.target.files.length > 0) {
+                        console.log(' - 파일명:', e.target.files[0].name);
+                        console.log(' - 파일크기:', (e.target.files[0].size / (1024*1024)).toFixed(2), 'MB');
+                        console.log('🚀 미니맵 파일 처리 시작...');
+                        self.handleFiles(e.target.files, 'minimap-upload');
+                    } else {
+                        console.warn('⚠️ 미니맵 파일이 선택되지 않음');
+                    }
+                });
+            } else {
+                console.error('❌ 미니맵 파일 입력 요소를 찾을 수 없습니다.');
+            }
+        } catch (error) {
+            console.error('❌ 미니맵 파일 입력 설정 실패:', error);
+        }
+
+        // 장면 이미지 파일 입력 - 기본 addEventListener 사용
+        try {
+            console.log('🏠 장면 파일 입력 설정...');
+            var scenesInput = document.getElementById('scenes-files');
+            if (scenesInput) {
+                console.log('✅ 장면 파일 입력 요소 발견:', scenesInput);
+                scenesInput.addEventListener('change', function(e) {
+                    console.log('🏠 Scene 파일들 선택됨:', e.target.files.length, '개');
+                    if (e.target.files.length > 0) {
+                        var totalSize = 0;
+                        for (var i = 0; i < e.target.files.length; i++) {
+                            console.log(' - 파일', (i+1) + ':', e.target.files[i].name,
+                                '(' + (e.target.files[i].size / (1024*1024)).toFixed(2) + 'MB)');
+                            totalSize += e.target.files[i].size;
+                        }
+                        console.log(' - 총 크기:', (totalSize / (1024*1024)).toFixed(2), 'MB');
+                        console.log('🚀 장면 파일들 처리 시작...');
+                        self.handleFiles(e.target.files, 'scenes-upload');
+                    } else {
+                        console.warn('⚠️ 장면 파일이 선택되지 않음');
+                    }
+                });
+            } else {
+                console.error('❌ 장면 파일 입력 요소를 찾을 수 없습니다.');
+            }
+        } catch (error) {
+            console.error('❌ 장면 파일 입력 설정 실패:', error);
         }
 
         // 파일 입력 초기화 (재선택 허용)
-        this.setupFileInputReset();
+        try {
+            this.setupFileInputReset();
+        } catch (error) {
+            console.error('❌ 파일 입력 리셋 설정 실패:', error);
+        }
+
+        console.log('✅ setupFileInputs 완료');
     },
 
-    // 전체 업로드 영역을 클릭 가능하게 설정
+    // 전체 업로드 영역을 클릭 가능하게 설정 - 완전히 재작성
     setupClickableUploadAreas: function() {
-        console.log('setupClickableUploadAreas 시작...');
+        console.log('🔧 setupClickableUploadAreas 시작...');
         var self = this;
-        var uploadAreas = document.querySelectorAll('.file-upload-area');
-        console.log('찾은 업로드 영역 개수:', uploadAreas.length);
 
-        for (var i = 0; i < uploadAreas.length; i++) {
-            var area = uploadAreas[i];
-            area.classList.add('clickable');
-            console.log('업로드 영역 설정:', area.id);
+        try {
+            var uploadAreas = document.querySelectorAll('.file-upload-area');
+            console.log('📦 찾은 업로드 영역 개수:', uploadAreas.length);
 
-            // 기존 이벤트 리스너 제거 (중복 방지)
-            area.removeEventListener('click', this._boundClickHandler);
+            if (uploadAreas.length === 0) {
+                console.error('❌ 업로드 영역을 찾을 수 없습니다. DOM이 준비되지 않았을 수 있습니다.');
+                return;
+            }
 
-            // 클릭 이벤트 핸들러 바인딩
-            this._boundClickHandler = function(e) {
-                console.log('업로드 영역 클릭됨:', this.id, 'target:', e.target);
+            // 각 업로드 영역에 대해 개별적으로 처리 (클로저 문제 해결)
+            for (var i = 0; i < uploadAreas.length; i++) {
+                this.setupSingleUploadArea(uploadAreas[i]);
+            }
 
-                // 버튼, 리셋 버튼, 파일 상태 액션 영역이 아닌 경우만 파일 선택
-                if (!e.target.classList.contains('btn') &&
-                    !e.target.classList.contains('btn-reset') &&
-                    !e.target.closest('.btn') &&
-                    !e.target.closest('.file-status-actions')) {
-
-                    var uploadId = this.id;
-                    var inputId = self.getInputIdFromUploadId(uploadId);
-                    console.log('파일 선택 시도:', uploadId, '→', inputId);
-
-                    if (inputId) {
-                        var input = document.getElementById(inputId);
-                        if (input) {
-                            console.log('파일 입력 요소 클릭:', input);
-                            input.click();
-                        } else {
-                            console.error('파일 입력 요소를 찾을 수 없음:', inputId);
-                        }
-                    }
-                } else {
-                    console.log('클릭 무시됨 (버튼 또는 액션 영역)');
-                }
-            };
-
-            area.addEventListener('click', this._boundClickHandler);
+            console.log('✅ setupClickableUploadAreas 완료');
+        } catch (error) {
+            console.error('💥 setupClickableUploadAreas 오류:', error);
         }
-        console.log('setupClickableUploadAreas 완료');
+    },
+
+    // 개별 업로드 영역 설정 (클로저 문제 해결)
+    setupSingleUploadArea: function(area) {
+        var self = this;
+        var uploadId = area.id;
+        var inputId = this.getInputIdFromUploadId(uploadId);
+
+        console.log('🎯 업로드 영역 설정:', uploadId, '→', inputId);
+
+        if (!inputId) {
+            console.error('❌ 매핑되지 않은 업로드 ID:', uploadId);
+            return;
+        }
+
+        area.classList.add('clickable');
+
+        // 클릭 이벤트 핸들러 - 클로저로 uploadId와 inputId 보존
+        var clickHandler = function(e) {
+            console.log('🖱️ 업로드 영역 클릭:', uploadId, 'target:', e.target.tagName);
+
+            // 버튼이나 액션 영역 클릭 시 무시
+            if (self.shouldIgnoreClick(e.target)) {
+                console.log('⏭️ 클릭 무시됨 (버튼 또는 액션 영역)');
+                return;
+            }
+
+            // 파일 입력 요소 찾기 및 클릭
+            var input = document.getElementById(inputId);
+            if (input) {
+                console.log('🚀 파일 입력 요소 클릭 실행:', inputId);
+                try {
+                    input.click();
+                } catch (clickError) {
+                    console.error('💥 input.click() 실행 오류:', clickError);
+                }
+            } else {
+                console.error('❌ 파일 입력 요소를 찾을 수 없음:', inputId);
+            }
+        };
+
+        // 이벤트 리스너 등록
+        area.addEventListener('click', clickHandler);
+        console.log('✅ 클릭 이벤트 등록 완료:', uploadId);
+    },
+
+    // 클릭 무시 여부 판단
+    shouldIgnoreClick: function(target) {
+        return target.classList.contains('btn') ||
+               target.classList.contains('btn-reset') ||
+               target.closest('.btn') ||
+               target.closest('.file-status-actions');
     },
 
     // 업로드 ID에서 입력 ID 매핑
@@ -727,8 +857,8 @@ var fileUploadManager = {
     },
 
     handleSceneFiles: function(files) {
-        // 파일 개수 검증
-        if (!this.validateMultipleFiles(files, 20)) return;
+        // 파일 개수 검증 (최대 200개)
+        if (!this.validateMultipleFiles(files, 200)) return;
 
         var validFiles = [];
         var rejectedFiles = [];
@@ -786,14 +916,24 @@ var fileUploadManager = {
                     // 이미지 유효성 검사
                     var img = new Image();
                     img.onload = function() {
+                        var sceneId = 'scene_' + Date.now() + '_' + index;
+
+                        // 실제 이미지 데이터는 메모리 캐시에 저장
+                        sessionImageCache[sceneId] = e.target.result;
+
+                        // appState에는 메타데이터만 저장
                         appState.sceneImages.push({
+                            id: sceneId, // 고유 ID 추가
                             name: file.name,
-                            data: e.target.result,
+                            data: 'current_session_stored', // localStorage에 저장되지 않음을 표시
                             index: index,
                             width: img.width,
                             height: img.height,
-                            size: file.size
+                            size: file.size,
+                            isCurrentSession: true // 현재 세션에서 업로드된 이미지 표시
                         });
+
+                        // 메모리 캐시에 저장 완료
 
                         successCount++;
                         loadedCount++;
@@ -826,15 +966,36 @@ var fileUploadManager = {
                             return a.index - b.index;
                         });
 
+                        console.log('✅ 장면 파일 업로드 완료:', successCount + '개 성공');
+                        console.log('📋 메모리 캐시 보존:', Object.keys(sessionImageCache).length + '개 이미지');
+
                         // 결과 메시지 구성
                         var statusMessage = '';
                         if (successCount > 0) {
                             statusMessage += '✅ ' + successCount + '개의 장면 이미지 업로드 완료';
 
-                            // 썸네일 표시 추가
-                            statusMessage += '<div class="scenes-thumbnails">';
+                            // 썸네일 표시 추가 (가로 그리드 형태)
+                            statusMessage += '<div class="scenes-thumbnails-grid">';
                             for (var i = 0; i < appState.sceneImages.length; i++) {
-                                statusMessage += '<img src="' + appState.sceneImages[i].data + '" class="scene-thumbnail" alt="장면 ' + (i + 1) + '">';
+                                var scene = appState.sceneImages[i];
+                                var sceneName = scene.name || '장면 ' + (i + 1);
+                                var thumbnailSrc = '';
+
+                                // 메모리 캐시에서 이미지 데이터 가져오기
+                                if (scene.id && sessionImageCache[scene.id]) {
+                                    thumbnailSrc = sessionImageCache[scene.id];
+                                } else if (scene.data && scene.data.startsWith && scene.data.startsWith('data:image/')) {
+                                    thumbnailSrc = scene.data;
+                                }
+
+                                statusMessage += '<div class="scene-thumbnail-item">';
+                                if (thumbnailSrc) {
+                                    statusMessage += '<img src="' + thumbnailSrc + '" class="scene-thumbnail" alt="' + sceneName + '">';
+                                } else {
+                                    statusMessage += '<div class="scene-placeholder-small">🖼️</div>';
+                                }
+                                statusMessage += '<div class="scene-thumbnail-name">' + sceneName + '</div>';
+                                statusMessage += '</div>';
                             }
                             statusMessage += '</div>';
                         }
@@ -852,6 +1013,12 @@ var fileUploadManager = {
 
                         self.showFileStatus('scenes-status', statusMessage,
                             errorCount > 0 ? 'error' : 'success');
+
+                        // 장면 업로드 영역에 has-files 클래스 추가 (그리드 확장용)
+                        var scenesUploadArea = document.getElementById('scenes-upload');
+                        if (scenesUploadArea && successCount > 0) {
+                            scenesUploadArea.classList.add('has-files');
+                        }
 
                         stepController.checkStep1Completion();
                     } else {
@@ -967,7 +1134,7 @@ var fileUploadManager = {
     },
 
     validateMultipleFiles: function(files, maxCount) {
-        maxCount = maxCount || 50; // 기본 최대 50개
+        maxCount = maxCount || 200; // 기본 최대 200개
 
         if (files.length > maxCount) {
             utils.showError('한 번에 업로드할 수 있는 파일 개수를 초과했습니다.\n' +
@@ -1056,6 +1223,8 @@ var fileUploadManager = {
             appState.minimapImage = null;
         } else if (uploadAreaId === 'scenes-upload') {
             appState.sceneImages = [];
+            // has-files 클래스 제거
+            uploadArea.classList.remove('has-files');
         }
 
         stepController.checkStep1Completion();
@@ -1069,34 +1238,73 @@ var stepController = {
     },
 
     setupNavigationButtons: function() {
-        // 1단계 다음 버튼 - EventManager 사용
-        eventManager.onClick('next-step-1', function() {
-            stepController.goToStep(2);
-        });
+        var self = this;
 
-        // 2단계 버튼들 - EventManager 사용
-        eventManager.onClick('prev-step-2', function() {
-            stepController.goToStep(1);
-        });
-        eventManager.onClick('next-step-2', function() {
-            stepController.goToStep(3);
-        });
+        // 1단계 다음 버튼 - 직접 이벤트 바인딩
+        var nextStep1Btn = document.getElementById('next-step-1');
+        if (nextStep1Btn) {
+            nextStep1Btn.addEventListener('click', function() {
+                console.log('1단계 → 2단계 이동');
+                self.goToStep(2);
+            });
+        }
 
-        // 3단계 버튼들 - EventManager 사용
-        eventManager.onClick('prev-step-3', function() {
-            stepController.goToStep(2);
-        });
-        eventManager.onClick('next-step-3', function() {
-            stepController.goToStep(4);
-        });
+        // 2단계 버튼들 - 직접 이벤트 바인딩
+        var prevStep2Btn = document.getElementById('prev-step-2');
+        if (prevStep2Btn) {
+            prevStep2Btn.addEventListener('click', function() {
+                console.log('2단계 → 1단계 이동');
+                self.goToStep(1);
+            });
+        }
 
-        // 4단계 버튼들 - EventManager 사용
-        eventManager.onClick('prev-step-4', function() {
-            stepController.goToStep(3);
-        });
-        eventManager.onClick('generate-ppt', function() {
-            stepController.generatePPT();
-        });
+        var nextStep2Btn = document.getElementById('next-step-2');
+        if (nextStep2Btn) {
+            nextStep2Btn.addEventListener('click', function() {
+                console.log('2단계 → 3단계 이동');
+                self.goToStep(3);
+            });
+        }
+
+        // 3단계 버튼들 - 직접 이벤트 바인딩
+        var prevStep3Btn = document.getElementById('prev-step-3');
+        if (prevStep3Btn) {
+            prevStep3Btn.addEventListener('click', function() {
+                console.log('3단계 → 2단계 이동');
+                self.goToStep(2);
+            });
+        }
+
+        var nextStep3Btn = document.getElementById('next-step-3');
+        if (nextStep3Btn) {
+            nextStep3Btn.addEventListener('click', function() {
+                console.log('3단계 → 4단계 이동');
+                self.goToStep(4);
+            });
+        }
+
+        // 4단계 버튼들 - 직접 이벤트 바인딩
+        var prevStep4Btn = document.getElementById('prev-step-4');
+        if (prevStep4Btn) {
+            prevStep4Btn.addEventListener('click', function() {
+                console.log('4단계 → 3단계 이동');
+                self.goToStep(3);
+            });
+        }
+
+        var generatePptBtn = document.getElementById('generate-ppt');
+        if (generatePptBtn) {
+            generatePptBtn.addEventListener('click', function() {
+                console.log('PPT 생성 시작');
+                if (typeof pptGenerator !== 'undefined') {
+                    pptGenerator.generatePPT();
+                } else {
+                    console.error('pptGenerator를 찾을 수 없습니다');
+                }
+            });
+        }
+
+        console.log('네비게이션 버튼 이벤트 바인딩 완료');
     },
 
     goToStep: function(step) {
@@ -1142,10 +1350,12 @@ var stepController = {
     checkStep1Completion: function() {
         var hasExcel = appState.excelData !== null;
         var hasMinimap = appState.minimapImage !== null;
-        var hasScenes = appState.sceneImages.length > 0;
+        var hasScenes = appState.sceneImages && appState.sceneImages.length > 0;
 
         var nextButton = document.getElementById('next-step-1');
-        nextButton.disabled = !(hasExcel && hasMinimap && hasScenes);
+        if (nextButton) {
+            nextButton.disabled = !(hasExcel && hasMinimap && hasScenes);
+        }
     },
 
     checkStep3Completion: function() {
@@ -1528,8 +1738,26 @@ var excelParser = {
         var headerInfo = this.detectHeaders(data);
         console.log('시트 "' + sheetName + '" 헤더 정보:', headerInfo);
 
-        if (!headerInfo.headerRow) {
-            console.warn('시트 "' + sheetName + '"에서 헤더를 찾을 수 없습니다');
+        if (!headerInfo.headerRow || headerInfo.headerRow === -1) {
+            console.warn('시트 "' + sheetName + '"에서 헤더를 찾을 수 없습니다. 기본 추출 모드 사용');
+            // 현재 시트로 임시 설정하고 기본 추출 실행
+            var originalSheet = appState.currentSheet;
+            var originalData = appState.excelData;
+            appState.currentSheet = sheetName;
+            appState.excelData = data;
+
+            // 기본 추출 모드 실행
+            var originalMaterials = appState.materials.slice(); // 백업
+            appState.materials = [];
+            this.extractBasicMaterials();
+            sheetMaterials = appState.materials.slice(); // 추출된 자재 복사
+            appState.materials = originalMaterials; // 원래 상태 복원
+
+            // 원래 시트 복원
+            appState.currentSheet = originalSheet;
+            appState.excelData = originalData;
+
+            console.log('시트 "' + sheetName + '" 기본 추출 완료:', sheetMaterials.length, '개 자재');
             return sheetMaterials;
         }
 
@@ -2028,6 +2256,8 @@ var processManager = {
             '<span class="process-name">' + process.name + '</span>' +
             '<span class="scene-count">' + selectedCount + '</span>' +
             '</button>' +
+            '<button class="process-edit-btn" data-process-id="' + process.id + '" ' +
+            'title="' + process.name + ' 이름 수정">✏️</button>' +
             (appState.processes.length > 1 ?
                 '<button class="process-delete-btn" data-process-id="' + process.id + '" ' +
                 'title="' + process.name + ' 삭제">&times;</button>' : '');
@@ -2039,6 +2269,15 @@ var processManager = {
         tabButton.addEventListener('click', function() {
             self.switchProcess(this.getAttribute('data-process-id'));
         });
+
+        // 편집 버튼 이벤트
+        var editButton = tab.querySelector('.process-edit-btn');
+        if (editButton) {
+            editButton.addEventListener('click', function(e) {
+                e.stopPropagation();
+                self.editProcessName(this.getAttribute('data-process-id'));
+            });
+        }
 
         // 삭제 버튼 이벤트
         var deleteButton = tab.querySelector('.process-delete-btn');
@@ -2066,9 +2305,24 @@ var processManager = {
 
         if (!currentProcess) return;
 
-        contentContainer.innerHTML = '<h3>' + currentProcess.name + ' - 장면 선택</h3>' +
-            '<p>이 공정에 포함할 장면들을 선택하세요.</p>' +
-            '<div id="scene-selection-grid" class="scene-grid"></div>';
+        var totalScenes = appState.sceneImages ? appState.sceneImages.length : 0;
+        var selectedCount = currentProcess.selectedScenes ? currentProcess.selectedScenes.length : 0;
+
+        contentContainer.innerHTML =
+            '<div class="process-header">' +
+                '<h3>' + currentProcess.name + ' - 장면 선택</h3>' +
+                '<p>이 공정에 포함할 장면들을 선택하세요. (' + selectedCount + '/' + totalScenes + ' 선택됨)</p>' +
+            '</div>' +
+            '<div class="scene-lists-container">' +
+                '<div class="scene-list-section">' +
+                    '<h4>선택 가능한 장면</h4>' +
+                    '<div id="available-scenes-grid" class="scene-grid"></div>' +
+                '</div>' +
+                '<div class="scene-list-section">' +
+                    '<h4>전체 이미지 목록</h4>' +
+                    '<div id="all-scenes-grid" class="scene-grid readonly"></div>' +
+                '</div>' +
+            '</div>';
 
         this.renderSceneSelection();
     },
@@ -2079,13 +2333,43 @@ var processManager = {
     },
 
     renderAvailableScenes: function() {
+        console.log('🔍 renderAvailableScenes 디버깅 시작');
+        console.log('- sessionImageCache 키 개수:', Object.keys(sessionImageCache).length);
+        console.log('- sessionImageCache 키들:', Object.keys(sessionImageCache));
+        console.log('- appState.sceneImages 개수:', appState.sceneImages ? appState.sceneImages.length : 0);
+        if (appState.sceneImages && appState.sceneImages.length > 0) {
+            console.log('- 첫 번째 이미지:', appState.sceneImages[0]);
+        }
+
         var gridContainer = document.getElementById('available-scenes-grid');
         if (!gridContainer) return;
 
         gridContainer.innerHTML = '';
 
-        if (appState.sceneImages.length === 0) {
+        if (!appState.sceneImages || appState.sceneImages.length === 0) {
             gridContainer.innerHTML = '<p>업로드된 장면 이미지가 없습니다.</p>';
+            return;
+        }
+
+        // 현재 세션에 실제 이미지 데이터가 있는지 확인
+        var hasValidImages = false;
+        for (var i = 0; i < appState.sceneImages.length; i++) {
+            var scene = appState.sceneImages[i];
+            if (scene.id && sessionImageCache[scene.id]) {
+                hasValidImages = true;
+                break;
+            }
+        }
+
+        // 메타데이터만 있고 실제 이미지가 없는 경우
+        if (!hasValidImages) {
+            console.warn('⚠️ 이미지 메타데이터는 있지만 실제 데이터가 메모리에 없습니다');
+            gridContainer.innerHTML =
+                '<div class="empty-state">' +
+                    '<p>이미지 데이터를 찾을 수 없습니다.</p>' +
+                    '<p>1단계에서 장면 이미지들을 다시 업로드해 주세요.</p>' +
+                    '<button class="btn btn-secondary" onclick="navigation.goToStep(1)">1단계로 이동</button>' +
+                '</div>';
             return;
         }
 
@@ -2100,6 +2384,13 @@ var processManager = {
 
             if (isUsedInOtherProcess && !isSelected) continue; // 다른 공정에서 사용 중인 장면은 표시하지 않음
 
+            // 실제 이미지 데이터 가져오기
+            var actualImageData = scene.data;
+            if (scene.data === 'current_session_stored' && scene.id && sessionImageCache[scene.id]) {
+                actualImageData = sessionImageCache[scene.id];
+                console.log('🎯 메모리 캐시에서 이미지 복원:', scene.name);
+            }
+
             var sceneItem = document.createElement('div');
             sceneItem.className = 'scene-item' + (isSelected ? ' selected' : '') + (isUsedInOtherProcess ? ' disabled' : '');
 
@@ -2107,7 +2398,7 @@ var processManager = {
             var statusText = isUsedInOtherProcess && !isSelected ? ' (사용 중: ' + usedInProcess + ')' : '';
 
             sceneItem.innerHTML =
-                '<img src="' + scene.data + '" alt="' + scene.name + '" class="scene-thumbnail">' +
+                '<img src="' + actualImageData + '" alt="' + scene.name + '" class="scene-thumbnail">' +
                 '<div class="scene-name">' + scene.name + statusText + '</div>' +
                 '<input type="checkbox" ' + (isSelected ? 'checked' : '') + ' data-scene-index="' + i + '" ' +
                 (isUsedInOtherProcess && !isSelected ? 'disabled' : '') + '>';
@@ -2151,6 +2442,12 @@ var processManager = {
             var isSelected = currentProcess.selectedScenes.indexOf(i) !== -1;
             var usedInProcess = this.getProcessUsingScene(i);
 
+            // 실제 이미지 데이터 가져오기
+            var actualImageData = scene.data;
+            if (scene.data === 'current_session_stored' && scene.id && sessionImageCache[scene.id]) {
+                actualImageData = sessionImageCache[scene.id];
+            }
+
             var sceneItem = document.createElement('div');
             sceneItem.className = 'scene-item readonly';
 
@@ -2170,7 +2467,7 @@ var processManager = {
 
             sceneItem.className += statusClass;
             sceneItem.innerHTML =
-                '<img src="' + scene.data + '" alt="' + scene.name + '" class="scene-thumbnail">' +
+                '<img src="' + actualImageData + '" alt="' + scene.name + '" class="scene-thumbnail">' +
                 '<div class="scene-name">' + scene.name + statusText + '</div>';
 
             gridContainer.appendChild(sceneItem);
@@ -2186,11 +2483,48 @@ var processManager = {
             return;
         }
 
-        var newProcessId = 'process_' + (Date.now()); // 고유 ID 생성
+        var self = this;
         var newProcessNumber = appState.processes.length + 1;
+        var defaultName = '공정' + newProcessNumber;
+
+        // 공정 이름 입력 받기
+        var processName = prompt('새 공정의 이름을 입력해주세요:', defaultName);
+
+        // 취소한 경우
+        if (processName === null) {
+            return;
+        }
+
+        // 빈 문자열인 경우 기본 이름 사용
+        if (processName.trim() === '') {
+            processName = defaultName;
+        }
+
+        // 이름 중복 체크
+        var isDuplicate = false;
+        for (var i = 0; i < appState.processes.length; i++) {
+            if (appState.processes[i].name === processName.trim()) {
+                isDuplicate = true;
+                break;
+            }
+        }
+
+        if (isDuplicate) {
+            utils.showError(
+                '이미 같은 이름의 공정이 존재합니다.\n다른 이름을 사용해주세요.',
+                '공정 이름 중복'
+            );
+            // 재시도
+            setTimeout(function() {
+                self.addNewProcess();
+            }, 100);
+            return;
+        }
+
+        var newProcessId = 'process_' + (Date.now()); // 고유 ID 생성
         var newProcess = {
             id: newProcessId,
-            name: '공정' + newProcessNumber,
+            name: processName.trim(),
             selectedScenes: [],
             isActive: false,
             createdAt: new Date().getTime()
@@ -2209,6 +2543,72 @@ var processManager = {
 
         // 새로 만든 공정으로 자동 전환
         this.switchProcess(newProcessId);
+    },
+
+    editProcessName: function(processId) {
+        var process = null;
+        for (var i = 0; i < appState.processes.length; i++) {
+            if (appState.processes[i].id === processId) {
+                process = appState.processes[i];
+                break;
+            }
+        }
+
+        if (!process) {
+            console.error('공정을 찾을 수 없습니다:', processId);
+            return;
+        }
+
+        var self = this;
+        var currentName = process.name;
+
+        // 현재 공정 이름을 기본값으로 하는 입력 창
+        var newName = prompt('공정 이름을 수정해주세요:', currentName);
+
+        // 취소한 경우
+        if (newName === null) {
+            return;
+        }
+
+        // 빈 문자열인 경우 원래 이름 유지
+        if (newName.trim() === '') {
+            utils.showError('공정 이름은 비어있을 수 없습니다.', '잘못된 입력');
+            return;
+        }
+
+        // 같은 이름인 경우 변경 안함
+        if (newName.trim() === currentName) {
+            return;
+        }
+
+        // 이름 중복 체크 (다른 공정과)
+        var isDuplicate = false;
+        for (var i = 0; i < appState.processes.length; i++) {
+            if (appState.processes[i].id !== processId && appState.processes[i].name === newName.trim()) {
+                isDuplicate = true;
+                break;
+            }
+        }
+
+        if (isDuplicate) {
+            utils.showError(
+                '이미 같은 이름의 공정이 존재합니다.\n다른 이름을 사용해주세요.',
+                '공정 이름 중복'
+            );
+            // 재시도
+            setTimeout(function() {
+                self.editProcessName(processId);
+            }, 100);
+            return;
+        }
+
+        // 공정 이름 변경
+        process.name = newName.trim();
+        console.log('공정 이름 변경됨:', currentName, '->', process.name);
+
+        // UI 업데이트
+        this.renderProcessTabs();
+        this.updateProcessSummary();
     },
 
     deleteProcess: function(processId) {
@@ -2418,14 +2818,43 @@ var processManager = {
             sizeInfo += '<br><small>' + utils.formatFileSize(scene.size) + '</small>';
         }
 
+        // 이미지 데이터 확인 (최적화된 경우 플레이스홀더 사용)
+        var imageElement = '';
+        var actualImageData = null;
+
+        // 현재 세션 이미지인 경우 메모리 캐시에서 데이터 가져오기
+        if (scene.data === 'current_session_stored' && scene.id && sessionImageCache[scene.id]) {
+            actualImageData = sessionImageCache[scene.id];
+        } else if (scene.data && scene.data.startsWith && scene.data.startsWith('data:image/')) {
+            actualImageData = scene.data;
+        }
+
+        // 실제 이미지 데이터가 있는 경우 이미지 표시
+        if (actualImageData) {
+            imageElement = '<img src="' + actualImageData + '" alt="' + scene.name + '" class="scene-thumbnail" ' +
+                'title="' + scene.name + '">';
+        } else {
+            // 최적화된 데이터나 캐시에 없는 경우 플레이스홀더 표시
+            var placeholderText = '';
+            if (scene.data === 'current_session_stored') {
+                placeholderText = '캐시 없음<br>재업로드 필요';
+            } else {
+                placeholderText = '이미지<br>최적화됨';
+            }
+
+            imageElement = '<div class="scene-placeholder" title="' + scene.name + ' (메모리/최적화됨)">' +
+                '<div class="placeholder-icon">🖼️</div>' +
+                '<div class="placeholder-text">' + placeholderText + '</div>' +
+            '</div>';
+        }
+
         sceneItem.innerHTML =
             '<div class="scene-checkbox-wrapper">' +
                 '<input type="checkbox" id="scene-' + sceneIndex + '" ' +
                 'data-scene-index="' + sceneIndex + '" ' + (isSelected ? 'checked' : '') + '>' +
                 '<label for="scene-' + sceneIndex + '" class="scene-checkbox-label"></label>' +
             '</div>' +
-            '<img src="' + scene.data + '" alt="' + scene.name + '" class="scene-thumbnail" ' +
-            'title="' + scene.name + '">' +
+            imageElement +
             '<div class="scene-info">' +
                 '<div class="scene-name" title="' + scene.name + '">' + scene.name + '</div>' +
                 '<div class="scene-details">' + sizeInfo + '</div>' +
@@ -2837,11 +3266,12 @@ var workspaceManager = {
 
                 var processId = this.getAttribute('data-process-id');
                 if (processId) {
-                self.selectProcess(processId);
-            } else {
-                self.clearWorkspace();
-            }
-        });
+                    self.selectProcess(processId);
+                } else {
+                    self.clearWorkspace();
+                }
+            });
+        }
     },
 
     // 공정 선택
