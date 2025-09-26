@@ -2984,21 +2984,25 @@ var workspaceManager = {
             // 공정 선택 드롭다운 생성
             this.renderProcessSelector(workspaceElement);
 
-            // 작업공간 컨테이너 생성 (3열 레이아웃: 미니맵 | 장면 이미지 | 자재표)
+            // 작업공간 컨테이너 생성 (2행 레이아웃: 상단(미니맵+장면이미지) | 하단(자재표 전체))
             var container = document.createElement('div');
             container.className = 'workspace-container';
             container.innerHTML =
-                '<div class="minimap-workspace" id="minimap-workspace">' +
-                    '<h3>미니맵</h3>' +
-                    '<div id="minimap-workspace-content"></div>' +
+                '<div class="workspace-top-row">' +
+                    '<div class="minimap-workspace" id="minimap-workspace">' +
+                        '<h3>미니맵</h3>' +
+                        '<div id="minimap-workspace-content"></div>' +
+                    '</div>' +
+                    '<div class="scene-workspace" id="scene-workspace">' +
+                        '<h3>장면 이미지</h3>' +
+                        '<div id="scene-workspace-content"></div>' +
+                    '</div>' +
                 '</div>' +
-                '<div class="scene-workspace" id="scene-workspace">' +
-                    '<h3>장면 이미지</h3>' +
-                    '<div id="scene-workspace-content"></div>' +
-                '</div>' +
-                '<div class="material-workspace" id="material-workspace">' +
-                    '<h3>자재표</h3>' +
-                    '<div id="material-workspace-content"></div>' +
+                '<div class="workspace-bottom-row">' +
+                    '<div class="material-workspace" id="material-workspace">' +
+                        '<h3>자재표</h3>' +
+                        '<div id="material-workspace-content"></div>' +
+                    '</div>' +
                 '</div>';
 
             workspaceElement.appendChild(container);
@@ -3380,11 +3384,18 @@ var workspaceManager = {
                 console.log('장면', i, ':', { sceneIndex: sceneIndex, sceneData: sceneData });
 
                 if (sceneData) {
+                    // 실제 이미지 데이터 가져오기 (메모리 캐시 확인)
+                    var actualImageData = sceneData.data;
+                    if (sceneData.data === 'current_session_stored' && sceneData.id && sessionImageCache[sceneData.id]) {
+                        actualImageData = sessionImageCache[sceneData.id];
+                        console.log('🎯 3단계 메모리 캐시에서 이미지 복원:', sceneData.name);
+                    }
+
                     // 장면 데이터를 workspaceManager에서 사용할 수 있도록 변환
                     var workspaceSceneData = {
                         id: sceneIndex,  // 인덱스를 ID로 사용
                         name: sceneData.name,
-                        url: sceneData.data  // data 속성을 url로 매핑
+                        url: actualImageData  // 실제 이미지 데이터 사용
                     };
                     html += this.renderSceneWorkspaceItem(workspaceSceneData);
                 } else {
