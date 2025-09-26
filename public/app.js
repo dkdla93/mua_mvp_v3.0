@@ -2415,12 +2415,29 @@ var processManager = {
         var availableScenes = this.getAvailableScenes();
         var currentProcessId = currentProcess.id;
 
+        console.log('🔍 장면 루프 시작:', {
+            totalScenes: appState.sceneImages.length,
+            currentProcessId: currentProcessId,
+            selectedScenes: currentProcess.selectedScenes
+        });
+
         for (var i = 0; i < appState.sceneImages.length; i++) {
             var scene = appState.sceneImages[i];
             var isSelected = currentProcess.selectedScenes.indexOf(i) !== -1;
             var isUsedInOtherProcess = this.isSceneUsedInOtherProcess(i, currentProcessId);
 
-            if (isUsedInOtherProcess && !isSelected) continue; // 다른 공정에서 사용 중인 장면은 표시하지 않음
+            console.log('🎬 장면 ' + i + ' 처리:', {
+                sceneName: scene.name,
+                isSelected: isSelected,
+                isUsedInOtherProcess: isUsedInOtherProcess,
+                selectedScenesArray: currentProcess.selectedScenes,
+                indexInSelected: currentProcess.selectedScenes.indexOf(i)
+            });
+
+            if (isUsedInOtherProcess && !isSelected) {
+                console.log('⏭️ 장면 ' + i + ' 스킵: 다른 공정에서 사용 중');
+                continue; // 다른 공정에서 사용 중인 장면은 표시하지 않음
+            }
 
             // 실제 이미지 데이터 가져오기
             var actualImageData = scene.data;
@@ -2444,6 +2461,12 @@ var processManager = {
                 // 순서 표시 번호 추가
                 var orderIndex = currentProcess.selectedScenes.indexOf(i);
                 statusText = ' (' + (orderIndex + 1) + '번째)' + statusText;
+
+                console.log('✅ 장면 ' + i + ' 드래그 가능 설정:', {
+                    sceneName: scene.name,
+                    orderIndex: orderIndex,
+                    isDraggable: true
+                });
             }
 
             sceneItem.innerHTML =
@@ -2471,11 +2494,16 @@ var processManager = {
 
             // 드래그 앤 드롭 이벤트 추가 (선택된 장면만)
             if (isSelected) {
+                console.log('🎯 장면 ' + i + ' 드래그 이벤트 등록 시작:', scene.name);
                 this.addDragDropEvents(sceneItem);
+            } else {
+                console.log('❌ 장면 ' + i + ' 드래그 이벤트 등록 안함 (선택되지 않음):', scene.name);
             }
 
             gridContainer.appendChild(sceneItem);
         }
+
+        console.log('🏁 장면 루프 완료');
     },
 
     // 드래그앤드롭 이벤트 추가
