@@ -2769,6 +2769,66 @@ var processManager = {
         this.checkStep2Completion();
     },
 
+    // 사용 가능한 장면들 가져오기 (다른 공정에서 사용하지 않는 장면들)
+    getAvailableScenes: function() {
+        var available = [];
+        var currentProcess = this.getCurrentProcess();
+        var currentProcessId = currentProcess ? currentProcess.id : null;
+
+        for (var i = 0; i < appState.sceneImages.length; i++) {
+            if (!this.isSceneUsedInOtherProcess(i, currentProcessId)) {
+                available.push(i);
+            }
+        }
+        return available;
+    },
+
+    // 특정 장면이 다른 공정에서 사용 중인지 확인
+    isSceneUsedInOtherProcess: function(sceneIndex, currentProcessId) {
+        for (var i = 0; i < appState.processes.length; i++) {
+            var process = appState.processes[i];
+            if (process.id !== currentProcessId &&
+                process.selectedScenes &&
+                process.selectedScenes.indexOf(sceneIndex) !== -1) {
+                return true;
+            }
+        }
+        return false;
+    },
+
+    // 특정 장면을 사용하고 있는 공정 이름 반환
+    getProcessUsingScene: function(sceneIndex) {
+        for (var i = 0; i < appState.processes.length; i++) {
+            var process = appState.processes[i];
+            if (process.selectedScenes && process.selectedScenes.indexOf(sceneIndex) !== -1) {
+                return process.name;
+            }
+        }
+        return null;
+    },
+
+    checkStep2Completion: function() {
+        var hasSelectedScenes = false;
+
+        for (var i = 0; i < appState.processes.length; i++) {
+            if (appState.processes[i].selectedScenes.length > 0) {
+                hasSelectedScenes = true;
+                break;
+            }
+        }
+
+        var nextButton = document.getElementById('next-step-2');
+        if (nextButton) {
+            nextButton.disabled = !hasSelectedScenes;
+
+            if (hasSelectedScenes) {
+                nextButton.title = '다음 단계로 진행합니다';
+            } else {
+                nextButton.title = '최소 하나의 공정에서 장면을 선택해야 합니다';
+            }
+        }
+    },
+
 };
 
 // ============================================================================
