@@ -5,48 +5,111 @@
 
 'use strict';
 
-// 전역 애플리케이션 상태
-var appState = {
-    // 엑셀 관련 데이터
-    excelData: null,
-    allSheets: {},
-    currentSheet: null,
-    materials: [],
+// 전역 애플리케이션 상태 - StateManager 기반으로 업그레이드
+// 호환성을 위한 Proxy 객체 생성
+var appState = new Proxy({}, {
+    get: function(target, property) {
+        // StateManager에서 상태 가져오기
+        return stateManager.getState(property);
+    },
 
-    // 이미지 관련 데이터
-    minimapImage: null,
-    sceneImages: [],
+    set: function(target, property, value) {
+        // StateManager로 상태 업데이트
+        stateManager.updateState(property, value);
+        return true;
+    },
 
-    // 공정 관리 (새 기능)
-    processes: [
-        {
-            id: 'process_1',
-            name: '공정1',
-            selectedScenes: [],
-            isActive: true
+    has: function(target, property) {
+        return stateManager.getState(property) !== undefined;
+    },
+
+    ownKeys: function(target) {
+        return Object.keys(stateManager.getState());
+    },
+
+    getOwnPropertyDescriptor: function(target, property) {
+        var value = stateManager.getState(property);
+        if (value !== undefined) {
+            return {
+                enumerable: true,
+                configurable: true,
+                value: value
+            };
         }
-    ],
-    currentProcess: 'process_1',
+        return undefined;
+    }
+});
 
-    // 자재 매핑 (공정별로 분리)
-    sceneMaterialMapping: {
-        'process_1': {}
+// StateManager 초기화 상태 확인 및 기존 데이터 병합
+(function initializeAppState() {
+    console.log('StateManager 기반 상태 초기화 시작...');
+
+    // 기존 상태가 있으면 로드, 없으면 기본값 사용
+    var currentState = stateManager.getState();
+
+    if (!currentState.processes || currentState.processes.length === 0) {
+        // 기본 공정 설정
+        stateManager.updateState('processes', [
+            {
+                id: 'process_1',
+                name: '공정1',
+                selectedScenes: [],
+                isActive: true
+            }
+        ]);
+        stateManager.updateState('currentProcess', 'process_1');
+    }
+
+    // 초기값 설정 (있으면 유지, 없으면 생성)
+    var defaultValues = {
+        'currentStep': 1,
+        'currentSelectedScene': 0,
+        'nextPositionNumber': 1,
+        'sceneMaterialMapping.process_1': {},
+        'sceneMaterialPositions.process_1': {},
+        'minimapBoxes.process_1': {}
+    };
+
+    Object.keys(defaultValues).forEach(function(key) {
+        if (stateManager.getState(key) === undefined) {
+            stateManager.updateState(key, defaultValues[key]);
+        }
+    });
+
+    console.log('StateManager 기반 상태 초기화 완료');
+    console.log('현재 상태:', stateManager.getInfo());
+})();
+
+// FileProcessor 연결 헬퍼 함수들
+var fileUtils = {
+    /**
+     * 안전한 파일 처리 래퍼
+     */
+    processFile: function(file, type, onProgress) {
+        return fileProcessor.processFile(file, {
+            type: type,
+            onProgress: onProgress,
+            optimize: type === 'image' ? { maxWidth: 1920, maxHeight: 1080 } : false
+        }).catch(function(error) {
+            console.error('FileProcessor 오류:', error);
+            utils.showError('파일 처리 중 오류가 발생했습니다: ' + error.message);
+            throw error;
+        });
     },
 
-    // 자재 위치 배치 (새 기능)
-    sceneMaterialPositions: {
-        'process_1': {}
-    },
-
-    // 미니맵 박스 (공정별로 분리)
-    minimapBoxes: {
-        'process_1': {}
-    },
-
-    // UI 상태
-    currentStep: 1,
-    currentSelectedScene: 0,
-    nextPositionNumber: 1
+    /**
+     * 여러 파일 배치 처리
+     */
+    processFiles: function(files, type, onProgress) {
+        return fileProcessor.processFiles(files, {
+            type: type,
+            onProgress: onProgress
+        }).catch(function(error) {
+            console.error('파일들 처리 오류:', error);
+            utils.showError('파일들 처리 중 오류가 발생했습니다: ' + error.message);
+            throw error;
+        });
+    }
 };
 
 // 유틸리티 함수들
@@ -266,7 +329,7 @@ var utils = {
                 document.removeEventListener('keydown', closeHandler);
             }
         };
-        document.addEventListener('keydown', closeHandler);
+        eventManager.addListener(document, 'keydown', closeHandler);
     }
 };
 
@@ -290,19 +353,22 @@ var fileUploadManager = {
         for (var i = 0; i < uploadAreas.length; i++) {
             var area = uploadAreas[i];
 
-            area.addEventListener('dragover', function(e) {
+            // EventManager 사용 - 드래그오버
+            eventManager.onDragOver(area, function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 this.classList.add('dragover');
             });
 
-            area.addEventListener('dragleave', function(e) {
+            // EventManager 사용 - 드래그리브
+            eventManager.addListener(area, 'dragleave', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 this.classList.remove('dragover');
             });
 
-            area.addEventListener('drop', function(e) {
+            // EventManager 사용 - 드롭
+            eventManager.onDrop(area, function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 this.classList.remove('dragover');
@@ -333,7 +399,7 @@ var fileUploadManager = {
         // 엑셀 파일 입력
         var excelInput = document.getElementById('excel-file');
         if (excelInput) {
-            excelInput.addEventListener('change', function(e) {
+            eventManager.onChange(excelInput, function(e) {
                 console.log('Excel file selected:', e.target.files);
                 if (e.target.files.length > 0) {
                     self.handleFiles(e.target.files, 'excel-upload');
@@ -348,7 +414,7 @@ var fileUploadManager = {
         // 미니맵 파일 입력
         var minimapInput = document.getElementById('minimap-file');
         if (minimapInput) {
-            minimapInput.addEventListener('change', function(e) {
+            eventManager.onChange(minimapInput, function(e) {
                 console.log('Minimap file selected:', e.target.files);
                 if (e.target.files.length > 0) {
                     self.handleFiles(e.target.files, 'minimap-upload');
@@ -363,7 +429,7 @@ var fileUploadManager = {
         // 장면 이미지 파일 입력
         var scenesInput = document.getElementById('scenes-files');
         if (scenesInput) {
-            scenesInput.addEventListener('change', function(e) {
+            eventManager.onChange(scenesInput, function(e) {
                 console.log('Scene files selected:', e.target.files);
                 if (e.target.files.length > 0) {
                     self.handleFiles(e.target.files, 'scenes-upload');
@@ -938,32 +1004,32 @@ var stepController = {
     },
 
     setupNavigationButtons: function() {
-        // 1단계 다음 버튼
-        document.getElementById('next-step-1').addEventListener('click', function() {
+        // 1단계 다음 버튼 - EventManager 사용
+        eventManager.onClick('next-step-1', function() {
             stepController.goToStep(2);
         });
 
-        // 2단계 버튼들
-        document.getElementById('prev-step-2').addEventListener('click', function() {
+        // 2단계 버튼들 - EventManager 사용
+        eventManager.onClick('prev-step-2', function() {
             stepController.goToStep(1);
         });
-        document.getElementById('next-step-2').addEventListener('click', function() {
+        eventManager.onClick('next-step-2', function() {
             stepController.goToStep(3);
         });
 
-        // 3단계 버튼들
-        document.getElementById('prev-step-3').addEventListener('click', function() {
+        // 3단계 버튼들 - EventManager 사용
+        eventManager.onClick('prev-step-3', function() {
             stepController.goToStep(2);
         });
-        document.getElementById('next-step-3').addEventListener('click', function() {
+        eventManager.onClick('next-step-3', function() {
             stepController.goToStep(4);
         });
 
-        // 4단계 버튼들
-        document.getElementById('prev-step-4').addEventListener('click', function() {
+        // 4단계 버튼들 - EventManager 사용
+        eventManager.onClick('prev-step-4', function() {
             stepController.goToStep(3);
         });
-        document.getElementById('generate-ppt').addEventListener('click', function() {
+        eventManager.onClick('generate-ppt', function() {
             stepController.generatePPT();
         });
     },
