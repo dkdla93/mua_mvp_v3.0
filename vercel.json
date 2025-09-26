@@ -5,12 +5,6 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run start",
   "public": true,
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/public/$1"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -58,6 +52,5 @@
       "destination": "/index.html"
     }
   ],
-  "functions": {},
   "regions": ["icn1"]
 }
