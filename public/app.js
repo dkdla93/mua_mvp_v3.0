@@ -2503,10 +2503,17 @@ var processManager = {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
 
+            console.log('📍 드래그오버 상세:', {
+                targetIndex: this.getAttribute('data-scene-index'),
+                isDragging: this.classList.contains('dragging'),
+                dataTransfer: e.dataTransfer.getData ? e.dataTransfer.getData('text/plain') : 'N/A',
+                effectAllowed: e.dataTransfer.effectAllowed,
+                dropEffect: e.dataTransfer.dropEffect
+            });
+
             // 드래그 중인 요소가 아닌 경우에만 스타일 적용
             if (!this.classList.contains('dragging')) {
                 this.classList.add('drag-over');
-                console.log('📍 드래그오버:', this.getAttribute('data-scene-index'));
             }
         });
 
@@ -2515,26 +2522,31 @@ var processManager = {
         });
 
         sceneItem.addEventListener('drop', function(e) {
+            console.log('🎯 드롭 이벤트 발생 - 시작');
+
             e.preventDefault();
             this.classList.remove('drag-over');
 
             var draggedSceneIndex = parseInt(e.dataTransfer.getData('text/plain'));
             var dropTargetSceneIndex = parseInt(this.getAttribute('data-scene-index'));
 
-            console.log('🎯 드롭 이벤트 발생:', {
+            console.log('🎯 드롭 이벤트 상세:', {
                 draggedSceneIndex: draggedSceneIndex,
                 dropTargetSceneIndex: dropTargetSceneIndex,
                 dataTransfer: e.dataTransfer.getData('text/plain'),
-                targetAttribute: this.getAttribute('data-scene-index')
+                targetAttribute: this.getAttribute('data-scene-index'),
+                isSameIndex: draggedSceneIndex === dropTargetSceneIndex
             });
 
             if (draggedSceneIndex !== dropTargetSceneIndex) {
-                console.log('장면 순서 변경:', draggedSceneIndex, '→', dropTargetSceneIndex);
+                console.log('✅ 장면 순서 변경 실행:', draggedSceneIndex, '→', dropTargetSceneIndex);
                 self.reorderScenes(draggedSceneIndex, dropTargetSceneIndex);
             } else {
                 console.log('❌ 같은 장면으로 드롭 - 순서 변경 안함');
             }
         });
+
+        console.log('✅ 드래그앤드롭 이벤트 등록 완료:', sceneItem.getAttribute('data-scene-index'));
     },
 
     // 장면 순서 변경
@@ -3317,7 +3329,7 @@ var workspaceManager = {
 
             // 미니맵 컨테이너 생성 (초기에는 빨간박스 없음)
             var html = '<div class="minimap-container" id="minimap-container" style="position: relative; display: inline-block; cursor: crosshair;">';
-            html += '<img src="' + appState.minimapImage + '" alt="미니맵" class="minimap-image" style="max-width: 100%; height: auto; pointer-events: none;">';
+            html += '<img src="' + appState.minimapImage + '" alt="미니맵" class="minimap-image" style="max-width: 100%; height: auto;">';
             html += '<div class="minimap-overlays" id="minimap-overlays" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>';
             html += '</div>';
 
