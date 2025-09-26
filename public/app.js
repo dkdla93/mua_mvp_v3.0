@@ -2561,7 +2561,7 @@ var processManager = {
         this.renderAllScenes();
 
         // 상태 저장
-        stateManager.saveState();
+        stateManager.saveToStorage();
     },
 
     renderAllScenes: function() {
@@ -3368,6 +3368,13 @@ var workspaceManager = {
             return;
         }
 
+        console.log('🗺️ 미니맵 컨테이너 확인:', {
+            minimapContainer: !!minimapContainer,
+            overlaysContainer: !!overlaysContainer,
+            minimapContainerId: minimapContainer ? minimapContainer.id : 'none',
+            minimapImage: minimapContainer ? minimapContainer.querySelector('.minimap-image') : null
+        });
+
         var isDrawing = false;
         var currentBox = null;
         var startX = 0;
@@ -3375,6 +3382,13 @@ var workspaceManager = {
 
         // 마우스 다운 - 드래그 시작
         minimapContainer.addEventListener('mousedown', function(e) {
+            console.log('🖱️ 미니맵 마우스다운 이벤트:', {
+                target: e.target.tagName,
+                className: e.target.className,
+                hasMinimapImageClass: e.target.classList.contains('minimap-image'),
+                targetElement: e.target
+            });
+
             if (e.target.classList.contains('minimap-image')) {
                 // 이벤트 전파 및 기본 동작 즉시 차단
                 e.preventDefault();
@@ -3397,6 +3411,8 @@ var workspaceManager = {
                 overlaysContainer.appendChild(currentBox);
 
                 console.log('빨간박스 그리기 시작:', startX, startY);
+            } else {
+                console.log('❌ 미니맵 이미지가 아닌 요소 클릭됨');
             }
         });
 
