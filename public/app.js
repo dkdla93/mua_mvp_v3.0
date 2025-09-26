@@ -2431,18 +2431,30 @@ var processManager = {
 
             var sceneItem = document.createElement('div');
             sceneItem.className = 'scene-item' + (isSelected ? ' selected' : '') + (isUsedInOtherProcess ? ' disabled' : '');
+            sceneItem.setAttribute('data-scene-index', i);
 
             var usedInProcess = this.getProcessUsingScene(i);
             var statusText = isUsedInOtherProcess && !isSelected ? ' (사용 중: ' + usedInProcess + ')' : '';
+
+            // 선택된 장면은 드래그 가능하도록 설정
+            if (isSelected) {
+                sceneItem.setAttribute('draggable', 'true');
+                sceneItem.classList.add('draggable');
+
+                // 순서 표시 번호 추가
+                var orderIndex = currentProcess.selectedScenes.indexOf(i);
+                statusText = ' (' + (orderIndex + 1) + '번째)' + statusText;
+            }
 
             sceneItem.innerHTML =
                 '<img src="' + actualImageData + '" alt="' + scene.name + '" class="scene-thumbnail">' +
                 '<div class="scene-name">' + scene.name + statusText + '</div>' +
                 '<input type="checkbox" ' + (isSelected ? 'checked' : '') + ' data-scene-index="' + i + '" ' +
-                (isUsedInOtherProcess && !isSelected ? 'disabled' : '') + '>';
+                (isUsedInOtherProcess && !isSelected ? 'disabled' : '') + '>' +
+                (isSelected ? '<div class="drag-handle">⋮⋮</div>' : '');
 
             sceneItem.addEventListener('click', function(e) {
-                if (e.target.type !== 'checkbox') {
+                if (e.target.type !== 'checkbox' && !e.target.classList.contains('drag-handle')) {
                     var checkbox = this.querySelector('input[type="checkbox"]');
                     if (!checkbox.disabled) {
                         checkbox.checked = !checkbox.checked;
@@ -2457,8 +2469,89 @@ var processManager = {
                 }
             });
 
+            // 드래그 앤 드롭 이벤트 추가 (선택된 장면만)
+            if (isSelected) {
+                this.addDragDropEvents(sceneItem);
+            }
+
             gridContainer.appendChild(sceneItem);
         }
+    },
+
+    // 드래그앤드롭 이벤트 추가
+    addDragDropEvents: function(sceneItem) {
+        var self = this;
+
+        sceneItem.addEventListener('dragstart', function(e) {
+            e.dataTransfer.setData('text/plain', this.getAttribute('data-scene-index'));
+            e.dataTransfer.effectAllowed = 'move';
+            this.classList.add('dragging');
+            console.log('드래그 시작:', this.getAttribute('data-scene-index'));
+        });
+
+        sceneItem.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+            // 모든 드롭 대상 스타일 제거
+            var allItems = document.querySelectorAll('.scene-item.selected');
+            for (var i = 0; i < allItems.length; i++) {
+                allItems[i].classList.remove('drag-over');
+            }
+            console.log('드래그 종료');
+        });
+
+        sceneItem.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            // 드래그 중인 요소가 아닌 경우에만 스타일 적용
+            if (!this.classList.contains('dragging')) {
+                this.classList.add('drag-over');
+            }
+        });
+
+        sceneItem.addEventListener('dragleave', function(e) {
+            this.classList.remove('drag-over');
+        });
+
+        sceneItem.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+
+            var draggedSceneIndex = parseInt(e.dataTransfer.getData('text/plain'));
+            var dropTargetSceneIndex = parseInt(this.getAttribute('data-scene-index'));
+
+            if (draggedSceneIndex !== dropTargetSceneIndex) {
+                console.log('장면 순서 변경:', draggedSceneIndex, '→', dropTargetSceneIndex);
+                self.reorderScenes(draggedSceneIndex, dropTargetSceneIndex);
+            }
+        });
+    },
+
+    // 장면 순서 변경
+    reorderScenes: function(draggedIndex, dropTargetIndex) {
+        var currentProcess = this.getCurrentProcess();
+        if (!currentProcess || !currentProcess.selectedScenes) return;
+
+        var selectedScenes = currentProcess.selectedScenes;
+        var draggedPos = selectedScenes.indexOf(draggedIndex);
+        var targetPos = selectedScenes.indexOf(dropTargetIndex);
+
+        if (draggedPos === -1 || targetPos === -1) return;
+
+        // 배열에서 드래그된 요소를 제거
+        var draggedElement = selectedScenes.splice(draggedPos, 1)[0];
+
+        // 새 위치에 삽입
+        selectedScenes.splice(targetPos, 0, draggedElement);
+
+        console.log('새로운 순서:', selectedScenes);
+
+        // UI 다시 렌더링
+        this.renderAvailableScenes();
+        this.renderAllScenes();
+
+        // 상태 저장
+        stateManager.saveState();
     },
 
     renderAllScenes: function() {
@@ -3208,72 +3301,39 @@ var workspaceManager = {
                 return;
             }
 
-            // 미니맵 컨테이너 생성
-            var html = '<div class="minimap-container" style="position: relative; display: inline-block;">';
-            html += '<img src="' + appState.minimapImage + '" alt="미니맵" class="minimap-image" style="max-width: 100%; height: auto;">';
+            // 활성 장면 정보 가져오기
+            var activeSceneIndex = this.getActiveSceneForProcess(process);
+            var activeSceneData = activeSceneIndex !== null ? appState.sceneImages[activeSceneIndex] : null;
 
-            // 현재 활성 장면에 대해서만 빨간 박스 표시 (첫 번째 장면)
-            if (process.selectedScenes && process.selectedScenes.length > 0) {
-                html += '<div class="minimap-overlays" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">';
-
-                // 첫 번째 선택된 장면만 표시
-                var sceneIndex = process.selectedScenes[0];
-                var sceneData = appState.sceneImages[sceneIndex];
-
-                if (sceneData) {
-                    // 현재 활성 장면에 대해 빨간 박스 생성
-                    var boxStyle = this.generateSceneBox(0, 1);
-                    html += '<div class="scene-box active-scene" data-scene-index="' + sceneIndex + '" ';
-                    html += 'style="position: absolute; border: 3px solid #ff4444; background: rgba(255, 68, 68, 0.3); ';
-                    html += boxStyle + 'cursor: pointer;" ';
-                    html += 'title="현재 활성 장면: ' + sceneData.name + '">';
-                    html += '<span style="position: absolute; top: -25px; left: 2px; background: #ff4444; color: white; padding: 3px 8px; font-size: 12px; border-radius: 3px; font-weight: bold;">';
-                    html += '활성';
-                    html += '</span>';
-                    html += '</div>';
-                }
-
-                html += '</div>';
-            }
-
+            // 미니맵 컨테이너 생성 (초기에는 빨간박스 없음)
+            var html = '<div class="minimap-container" id="minimap-container" style="position: relative; display: inline-block; cursor: crosshair;">';
+            html += '<img src="' + appState.minimapImage + '" alt="미니맵" class="minimap-image" style="max-width: 100%; height: auto; pointer-events: none;">';
+            html += '<div class="minimap-overlays" id="minimap-overlays" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;"></div>';
             html += '</div>';
 
-            // 범례 추가 - 현재 활성 장면 정보
-            html += '<div class="minimap-legend" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">';
-            html += '<h4 style="margin: 0 0 8px 0; font-size: 14px;">현재 활성 장면</h4>';
+            // 사용자 안내 정보
+            html += '<div class="minimap-controls" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">';
+            html += '<h4 style="margin: 0 0 8px 0; font-size: 14px;">현재 작업 장면</h4>';
 
-            if (process.selectedScenes && process.selectedScenes.length > 0) {
-                // 첫 번째 장면만 표시
-                var sceneIndex = process.selectedScenes[0];
-                var sceneData = appState.sceneImages[sceneIndex];
-
-                if (sceneData) {
-                    html += '<div style="display: flex; align-items: center; margin-bottom: 4px;">';
-                    html += '<span style="display: inline-block; width: 24px; height: 20px; background: #ff4444; margin-right: 8px; text-align: center; color: white; font-size: 11px; line-height: 20px; border-radius: 2px; font-weight: bold;">';
-                    html += '활성';
-                    html += '</span>';
-                    html += '<span style="font-size: 13px; font-weight: 500;">' + sceneData.name + '</span>';
-                    html += '</div>';
-
-                    // 전체 장면 개수 정보
-                    if (process.selectedScenes.length > 1) {
-                        html += '<p style="margin: 8px 0 0 0; color: #666; font-size: 12px;">';
-                        html += '총 ' + process.selectedScenes.length + '개 장면 중 1번째 표시';
-                        html += '</p>';
-                    }
-                } else {
-                    html += '<p style="margin: 0; color: #666; font-size: 13px;">장면 데이터를 찾을 수 없습니다.</p>';
-                }
+            if (activeSceneData) {
+                html += '<div style="display: flex; align-items: center; margin-bottom: 8px;">';
+                html += '<span style="display: inline-block; width: 60px; height: 20px; background: #667eea; margin-right: 8px; text-align: center; color: white; font-size: 11px; line-height: 20px; border-radius: 2px; font-weight: bold;">';
+                html += '작업중';
+                html += '</span>';
+                html += '<span style="font-size: 13px; font-weight: 500;">' + activeSceneData.name + '</span>';
+                html += '</div>';
+                html += '<p style="margin: 0; color: #666; font-size: 12px;">📍 마우스를 드래그하여 이 장면의 위치를 표시하세요</p>';
+                html += '<button id="clear-minimap-boxes" class="btn btn-sm btn-secondary" style="margin-top: 8px;">빨간박스 전체 제거</button>';
             } else {
-                html += '<p style="margin: 0; color: #666; font-size: 13px;">선택된 장면이 없습니다.</p>';
+                html += '<p style="margin: 0; color: #666; font-size: 13px;">활성 장면이 선택되지 않았습니다.</p>';
             }
 
             html += '</div>';
 
             contentElement.innerHTML = html;
 
-            // 클릭 이벤트 추가
-            this.bindMinimapEvents();
+            // 드래그 그리기 이벤트 추가
+            this.setupMinimapDragDrawing();
 
             console.log('미니맵 렌더링 완료');
 
@@ -3284,6 +3344,119 @@ var workspaceManager = {
                 contentElement.innerHTML = '<p class="empty-state">미니맵 표시 중 오류가 발생했습니다.</p>';
             }
         }
+    },
+
+    // 미니맵 드래그 그리기 설정
+    setupMinimapDragDrawing: function() {
+        var self = this;
+        var minimapContainer = document.getElementById('minimap-container');
+        var overlaysContainer = document.getElementById('minimap-overlays');
+        var clearButton = document.getElementById('clear-minimap-boxes');
+
+        if (!minimapContainer || !overlaysContainer) {
+            console.error('미니맵 컨테이너를 찾을 수 없습니다.');
+            return;
+        }
+
+        var isDrawing = false;
+        var currentBox = null;
+        var startX = 0;
+        var startY = 0;
+
+        // 마우스 다운 - 드래그 시작
+        minimapContainer.addEventListener('mousedown', function(e) {
+            if (e.target.classList.contains('minimap-image')) {
+                isDrawing = true;
+
+                var rect = minimapContainer.getBoundingClientRect();
+                startX = e.clientX - rect.left;
+                startY = e.clientY - rect.top;
+
+                // 새 빨간박스 생성
+                currentBox = document.createElement('div');
+                currentBox.className = 'minimap-box';
+                currentBox.style.cssText =
+                    'position: absolute; border: 3px solid #ff4444; background: rgba(255, 68, 68, 0.2); ' +
+                    'left: ' + startX + 'px; top: ' + startY + 'px; width: 0px; height: 0px; ' +
+                    'pointer-events: auto; cursor: move;';
+
+                overlaysContainer.appendChild(currentBox);
+
+                console.log('빨간박스 그리기 시작:', startX, startY);
+                e.preventDefault();
+            }
+        });
+
+        // 마우스 이동 - 드래그 중
+        minimapContainer.addEventListener('mousemove', function(e) {
+            if (!isDrawing || !currentBox) return;
+
+            var rect = minimapContainer.getBoundingClientRect();
+            var currentX = e.clientX - rect.left;
+            var currentY = e.clientY - rect.top;
+
+            var left = Math.min(startX, currentX);
+            var top = Math.min(startY, currentY);
+            var width = Math.abs(currentX - startX);
+            var height = Math.abs(currentY - startY);
+
+            currentBox.style.left = left + 'px';
+            currentBox.style.top = top + 'px';
+            currentBox.style.width = width + 'px';
+            currentBox.style.height = height + 'px';
+        });
+
+        // 마우스 업 - 드래그 종료
+        minimapContainer.addEventListener('mouseup', function(e) {
+            if (!isDrawing || !currentBox) return;
+
+            isDrawing = false;
+
+            // 너무 작은 박스는 제거
+            if (parseInt(currentBox.style.width) < 10 || parseInt(currentBox.style.height) < 10) {
+                overlaysContainer.removeChild(currentBox);
+                console.log('너무 작은 박스 제거됨');
+            } else {
+                // 박스에 삭제 버튼 추가
+                self.addBoxDeleteButton(currentBox);
+                console.log('빨간박스 생성 완료:', currentBox.style.left, currentBox.style.top, currentBox.style.width, currentBox.style.height);
+            }
+
+            currentBox = null;
+        });
+
+        // 전체 제거 버튼 이벤트
+        if (clearButton) {
+            clearButton.addEventListener('click', function() {
+                var boxes = overlaysContainer.querySelectorAll('.minimap-box');
+                for (var i = 0; i < boxes.length; i++) {
+                    overlaysContainer.removeChild(boxes[i]);
+                }
+                console.log('모든 빨간박스 제거됨');
+            });
+        }
+
+        console.log('미니맵 드래그 그리기 설정 완료');
+    },
+
+    // 박스에 삭제 버튼 추가
+    addBoxDeleteButton: function(box) {
+        var deleteBtn = document.createElement('div');
+        deleteBtn.innerHTML = '×';
+        deleteBtn.className = 'box-delete-btn';
+        deleteBtn.style.cssText =
+            'position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; ' +
+            'background: #ff4444; color: white; border-radius: 50%; text-align: center; ' +
+            'line-height: 20px; cursor: pointer; font-weight: bold; font-size: 14px; ' +
+            'pointer-events: auto; z-index: 10;';
+
+        deleteBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            box.parentNode.removeChild(box);
+            console.log('빨간박스 개별 삭제됨');
+        });
+
+        box.appendChild(deleteBtn);
     },
 
     // 장면 박스 위치 생성 (임시 구현 - 실제로는 매핑 데이터 필요)

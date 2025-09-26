@@ -1063,6 +1063,83 @@ body {
     margin: 5px 0;
 }
 
+/* 드래그앤드롭 스타일 */
+.scene-item.draggable {
+    position: relative;
+    cursor: move;
+}
+
+.scene-item.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+}
+
+.scene-item.drag-over {
+    border: 3px dashed #667eea;
+    background-color: #f0f4ff;
+}
+
+.drag-handle {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 20px;
+    height: 20px;
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    cursor: grab;
+    transition: all 0.2s ease;
+}
+
+.drag-handle:hover {
+    background: #667eea;
+    transform: scale(1.1);
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+/* 미니맵 드래그 그리기 스타일 */
+.minimap-box {
+    border: 3px solid #ff4444;
+    background: rgba(255, 68, 68, 0.2);
+    position: absolute;
+    cursor: move;
+    transition: all 0.2s ease;
+}
+
+.minimap-box:hover {
+    border-color: #ff2222;
+    background: rgba(255, 68, 68, 0.3);
+    box-shadow: 0 2px 8px rgba(255, 68, 68, 0.4);
+}
+
+.box-delete-btn {
+    transition: all 0.2s ease;
+}
+
+.box-delete-btn:hover {
+    transform: scale(1.2);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.minimap-controls {
+    user-select: none;
+}
+
+.minimap-controls .btn {
+    font-size: 12px;
+    padding: 6px 12px;
+}
+
 /* 향상된 장면 선택 UI */
 .scene-grid {
     display: grid;
