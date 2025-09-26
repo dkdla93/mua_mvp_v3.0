@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>파일 업로드 디버그 테스트</title>
+    <style>
+        .test-upload {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            margin: 10px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .test-upload:hover {
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>파일 업로드 기본 테스트</h1>
+
+    <div class="test-upload" id="test-area">
+        <input type="file" id="test-file" accept=".xlsx,.xls" style="display: none;">
+        <p>여기를 클릭해서 파일 선택 테스트</p>
+    </div>
+
+    <div id="result"></div>
+
+    <script>
+        console.log('=== 기본 파일 업로드 테스트 시작 ===');
+
+        // DOM 로드 완료 확인
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('✅ DOM 로드 완료');
+
+            var testArea = document.getElementById('test-area');
+            var testFile = document.getElementById('test-file');
+            var result = document.getElementById('result');
+
+            console.log('요소 찾기:', {
+                testArea: !!testArea,
+                testFile: !!testFile,
+                result: !!result
+            });
+
+            if (testArea && testFile) {
+                // 클릭 이벤트
+                testArea.addEventListener('click', function() {
+                    console.log('🖱️ 영역 클릭됨');
+                    testFile.click();
+                });
+
+                // 파일 선택 이벤트
+                testFile.addEventListener('change', function(e) {
+                    console.log('📁 파일 선택됨:', e.target.files);
+                    if (e.target.files.length > 0) {
+                        var file = e.target.files[0];
+                        result.innerHTML = '<p>✅ 파일 선택 성공!<br>' +
+                            '파일명: ' + file.name + '<br>' +
+                            '크기: ' + (file.size / 1024).toFixed(2) + 'KB<br>' +
+                            '타입: ' + file.type + '</p>';
+                    }
+                });
+
+                console.log('✅ 이벤트 리스너 설정 완료');
+            } else {
+                console.error('❌ 요소를 찾을 수 없음');
+            }
+        });
+
+        // 전역 오류 확인
+        window.onerror = function(msg, url, line) {
+            console.error('❌ JavaScript 오류:', msg, 'at', url + ':' + line);
+            return false;
+        };
+    </script>
+</body>
+</html>

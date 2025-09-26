@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>간단한 파일 업로드 테스트</title>
+    <style>
+        .test-area {
+            border: 2px dashed #007bff;
+            padding: 30px;
+            margin: 20px;
+            cursor: pointer;
+            text-align: center;
+            background: #f8f9fa;
+        }
+        .test-area:hover {
+            background: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <h1>파일 업로드 기능 테스트</h1>
+
+    <!-- Test 1: Inline onclick button -->
+    <div class="test-area">
+        <h3>테스트 1: 인라인 onclick 버튼</h3>
+        <input type="file" id="test1" accept=".xlsx,.xls" style="display: none;">
+        <button type="button" onclick="document.getElementById('test1').click()">
+            파일 선택 (onclick)
+        </button>
+        <div id="result1"></div>
+    </div>
+
+    <!-- Test 2: JavaScript event listener -->
+    <div class="test-area" id="test-area-2">
+        <h3>테스트 2: JavaScript 이벤트 리스너</h3>
+        <input type="file" id="test2" accept=".xlsx,.xls" style="display: none;">
+        <button type="button" id="test-btn-2">파일 선택 (addEventListener)</button>
+        <div id="result2"></div>
+    </div>
+
+    <!-- Test 3: Clickable area -->
+    <div class="test-area" id="test-area-3">
+        <h3>테스트 3: 클릭 가능한 영역 전체</h3>
+        <input type="file" id="test3" accept=".xlsx,.xls" style="display: none;">
+        <p>이 영역 전체를 클릭하면 파일 선택이 됩니다</p>
+        <div id="result3"></div>
+    </div>
+
+    <script>
+        console.log('=== 파일 업로드 테스트 시작 ===');
+
+        // Test 1: 이미 HTML에서 onclick 처리됨
+        document.getElementById('test1').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                document.getElementById('result1').innerHTML =
+                    '✅ Test 1 성공: ' + e.target.files[0].name;
+            }
+        });
+
+        // Test 2: JavaScript addEventListener
+        document.getElementById('test-btn-2').addEventListener('click', function() {
+            console.log('Test 2 버튼 클릭됨');
+            document.getElementById('test2').click();
+        });
+
+        document.getElementById('test2').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                document.getElementById('result2').innerHTML =
+                    '✅ Test 2 성공: ' + e.target.files[0].name;
+            }
+        });
+
+        // Test 3: Clickable area
+        document.getElementById('test-area-3').addEventListener('click', function(e) {
+            console.log('Test 3 영역 클릭됨', e.target.tagName);
+            document.getElementById('test3').click();
+        });
+
+        document.getElementById('test3').addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                document.getElementById('result3').innerHTML =
+                    '✅ Test 3 성공: ' + e.target.files[0].name;
+            }
+        });
+
+        console.log('✅ 테스트 이벤트 리스너 설정 완료');
+    </script>
+</body>
+</html>

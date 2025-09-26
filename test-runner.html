@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FileProcessor 테스트 실행기</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-controls {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #ecf0f1;
+            border-radius: 4px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        .test-results {
+            font-family: monospace;
+            white-space: pre-wrap;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .summary-box {
+            background: #f8f9fa;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .error-box {
+            background: #fff5f5;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass { color: #28a745; font-weight: bold; }
+        .fail { color: #dc3545; font-weight: bold; }
+        .category-header {
+            font-size: 14px;
+            font-weight: bold;
+            color: #3498db;
+            margin: 10px 0 5px 0;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 FileProcessor 종합 테스트</h1>
+        <p>파일 업로드 및 처리 기능을 검증합니다.</p>
+    </div>
+
+    <div class="test-container">
+        <div class="test-controls">
+            <button class="btn btn-primary" onclick="runTests()">🚀 테스트 실행</button>
+            <button class="btn btn-secondary" onclick="clearResults()">🗑️ 결과 지우기</button>
+            <button class="btn btn-secondary" onclick="exportResults()">💾 결과 내보내기</button>
+        </div>
+
+        <div id="progress-section" style="display: none;">
+            <div class="progress">
+                <div class="progress-bar" id="progress-bar" style="width: 0%">0%</div>
+            </div>
+            <div id="current-test" style="margin: 10px 0; font-weight: bold;"></div>
+        </div>
+
+        <div id="summary-section"></div>
+
+        <div class="test-results" id="test-output"></div>
+    </div>
+
+    <!-- 필요한 라이브러리 로드 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
+    <script src="public/js/polyfills/polyfills.js"></script>
+    <script src="public/js/utils/worker-manager.js"></script>
+    <script src="public/js/utils/file-processor.js"></script>
+    <script src="file-processor-test.js"></script>
+
+    <script>
+        let testOutput = '';
+        let testStartTime = null;
+
+        // console.log 오버라이드하여 결과를 화면에 표시
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+        const originalConsoleWarn = console.warn;
+
+        console.log = function(...args) {
+            originalConsoleLog.apply(console, args);
+            const message = args.join(' ');
+            testOutput += message + '\n';
+            updateTestDisplay();
+        };
+
+        console.error = function(...args) {
+            originalConsoleError.apply(console, args);
+            const message = '❌ ERROR: ' + args.join(' ');
+            testOutput += message + '\n';
+            updateTestDisplay();
+        };
+
+        console.warn = function(...args) {
+            originalConsoleWarn.apply(console, args);
+            const message = '⚠️ WARN: ' + args.join(' ');
+            testOutput += message + '\n';
+            updateTestDisplay();
+        };
+
+        function updateTestDisplay() {
+            const outputElement = document.getElementById('test-output');
+            if (outputElement) {
+                outputElement.textContent = testOutput;
+                outputElement.scrollTop = outputElement.scrollHeight;
+            }
+        }
+
+        function updateProgress(current, total, currentTest = '') {
+            const progressBar = document.getElementById('progress-bar');
+            const currentTestElement = document.getElementById('current-test');
+            const progressSection = document.getElementById('progress-section');
+
+            if (progressBar && total > 0) {
+                const percentage = Math.round((current / total) * 100);
+                progressBar.style.width = percentage + '%';
+                progressBar.textContent = percentage + '%';
+                progressSection.style.display = 'block';
+
+                if (currentTestElement) {
+                    currentTestElement.textContent = currentTest || `진행중... ${current}/${total}`;
+                }
+            }
+        }
+
+        function displaySummary(results) {
+            const summarySection = document.getElementById('summary-section');
+            const { summary, detailed } = results;
+
+            const successRate = Math.round((summary.totalPassed / summary.totalTests) * 100);
+            const testDuration = testStartTime ? Math.round((Date.now() - testStartTime) / 1000) : 0;
+
+            let summaryHtml = `
+                <div class="${successRate >= 80 ? 'summary-box' : 'error-box'}">
+                    <h3>📊 테스트 결과 요약</h3>
+                    <p><strong>전체 테스트:</strong> ${summary.totalTests}개</p>
+                    <p><strong>성공:</strong> <span class="pass">${summary.totalPassed}개</span></p>
+                    <p><strong>실패:</strong> <span class="fail">${summary.totalFailed}개</span></p>
+                    <p><strong>성공률:</strong> ${successRate}%</p>
+                    <p><strong>실행 시간:</strong> ${testDuration}초</p>
+                </div>
+
+                <div class="summary-box">
+                    <h4>🔍 카테고리별 결과</h4>
+            `;
+
+            Object.entries(detailed).forEach(([category, result]) => {
+                const categorySuccess = Math.round((result.passed / result.tests) * 100) || 0;
+                summaryHtml += `
+                    <div class="category-header">
+                        ${getCategoryIcon(category)} ${getCategoryName(category)}:
+                        <span class="${result.failed === 0 ? 'pass' : 'fail'}">
+                            ${result.passed}/${result.tests} (${categorySuccess}%)
+                        </span>
+                    </div>
+                `;
+            });
+
+            summaryHtml += '</div>';
+            summarySection.innerHTML = summaryHtml;
+        }
+
+        function getCategoryIcon(category) {
+            const icons = {
+                excel: '📊',
+                image: '🖼️',
+                validation: '✅',
+                largeFile: '💾',
+                worker: '⚙️'
+            };
+            return icons[category] || '📋';
+        }
+
+        function getCategoryName(category) {
+            const names = {
+                excel: 'Excel 처리',
+                image: '이미지 처리',
+                validation: '파일 검증',
+                largeFile: '대용량 파일',
+                worker: 'Web Worker'
+            };
+            return names[category] || category;
+        }
+
+        async function runTests() {
+            testOutput = '';
+            testStartTime = Date.now();
+
+            document.getElementById('summary-section').innerHTML = '';
+            document.getElementById('test-output').textContent = '';
+
+            console.log('🎯 FileProcessor 종합 테스트 시작');
+            console.log('='.repeat(50));
+
+            try {
+                updateProgress(0, 5, '테스트 준비 중...');
+
+                // 필요한 객체들이 로드되었는지 확인
+                if (typeof runAllTests !== 'function') {
+                    throw new Error('테스트 함수를 찾을 수 없습니다.');
+                }
+
+                if (typeof fileProcessor === 'undefined') {
+                    throw new Error('FileProcessor 인스턴스를 찾을 수 없습니다.');
+                }
+
+                updateProgress(1, 5, 'Excel 파일 처리 테스트...');
+
+                const results = await runAllTests();
+
+                updateProgress(5, 5, '테스트 완료!');
+
+                if (results.error) {
+                    throw new Error(results.error);
+                }
+
+                displaySummary(results);
+
+                console.log('✅ 모든 테스트 완료!');
+
+            } catch (error) {
+                console.error('테스트 실행 실패:', error.message);
+                document.getElementById('summary-section').innerHTML = `
+                    <div class="error-box">
+                        <h3>❌ 테스트 실행 오류</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function clearResults() {
+            testOutput = '';
+            document.getElementById('test-output').textContent = '';
+            document.getElementById('summary-section').innerHTML = '';
+            document.getElementById('progress-section').style.display = 'none';
+        }
+
+        function exportResults() {
+            if (!testOutput) {
+                alert('내보낼 테스트 결과가 없습니다.');
+                return;
+            }
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filename = `file-processor-test-results-${timestamp}.txt`;
+
+            const blob = new Blob([testOutput], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+
+            URL.revokeObjectURL(url);
+        }
+
+        // 페이지 로드 완료 후 초기 상태 확인
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔧 테스트 환경 확인 중...');
+
+            // 필수 라이브러리 확인
+            const requiredObjects = {
+                'XLSX': typeof XLSX !== 'undefined',
+                'FileProcessor': typeof FileProcessor !== 'undefined',
+                'fileProcessor (인스턴스)': typeof fileProcessor !== 'undefined',
+                'WorkerManager': typeof WorkerManager !== 'undefined',
+                'Worker 지원': typeof Worker !== 'undefined'
+            };
+
+            console.log('📋 환경 체크 결과:');
+            Object.entries(requiredObjects).forEach(([name, available]) => {
+                console.log(`  ${available ? '✅' : '❌'} ${name}: ${available ? '사용가능' : '사용불가'}`);
+            });
+
+            console.log('\n준비 완료! "테스트 실행" 버튼을 클릭하세요.');
+        });
+    </script>
+</body>
+</html>

@@ -25,7 +25,8 @@
       "Bash(npm run dev:*)",
       "Bash(git commit:*)",
       "Bash(curl:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Read(//tmp/claude/**)"
     ],
     "deny": [],
     "ask": []

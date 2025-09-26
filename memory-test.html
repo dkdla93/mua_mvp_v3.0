@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>메모리 관리 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .warning { background-color: #fff3cd; color: #856404; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #memory-stats {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <h1>메모리 사용량 및 성능 최적화 검증 테스트</h1>
+
+    <div class="test-container">
+        <h2>실시간 메모리 사용량</h2>
+        <div id="memory-stats">메모리 정보 로딩 중...</div>
+        <button onclick="updateMemoryStats()">메모리 상태 새로고침</button>
+        <button onclick="forceGC()">가비지 컬렉션 강제 실행</button>
+    </div>
+
+    <div class="test-container">
+        <h2>EventManager 메모리 누수 방지 테스트</h2>
+        <div id="eventmanager-results"></div>
+        <button onclick="testEventManager()">EventManager 테스트 실행</button>
+        <button onclick="testEventManagerCleanup()">EventManager 정리 테스트</button>
+    </div>
+
+    <div class="test-container">
+        <h2>FileProcessor 리소스 관리 테스트</h2>
+        <div id="fileprocessor-results"></div>
+        <button onclick="testFileProcessor()">FileProcessor 테스트 실행</button>
+        <button onclick="testFileProcessorCleanup()">FileProcessor 정리 테스트</button>
+    </div>
+
+    <div class="test-container">
+        <h2>WorkerManager 워커 정리 테스트</h2>
+        <div id="workermanager-results"></div>
+        <button onclick="testWorkerManager()">WorkerManager 테스트 실행</button>
+        <button onclick="testWorkerManagerCleanup()">WorkerManager 정리 테스트</button>
+    </div>
+
+    <div class="test-container">
+        <h2>StateManager 메모리 효율성 테스트</h2>
+        <div id="statemanager-results"></div>
+        <button onclick="testStateManager()">StateManager 테스트 실행</button>
+        <button onclick="testStateManagerCleanup()">StateManager 정리 테스트</button>
+    </div>
+
+    <div class="test-container">
+        <h2>대용량 데이터 처리 테스트</h2>
+        <div id="performance-results"></div>
+        <button onclick="testLargeDataProcessing()">대용량 데이터 처리 테스트</button>
+        <button onclick="testChunkProcessing()">청크 처리 테스트</button>
+    </div>
+
+    <!-- 유틸리티 라이브러리 로드 -->
+    <script src="js/utils/event-manager.js"></script>
+    <script src="js/utils/file-processor.js"></script>
+    <script src="js/utils/worker-manager.js"></script>
+    <script src="js/utils/state-manager.js"></script>
+
+    <script>
+        let testResults = {};
+        let initialMemory = 0;
+
+        // 페이지 로드시 초기 메모리 측정
+        window.addEventListener('load', function() {
+            initialMemory = getMemoryUsage();
+            updateMemoryStats();
+
+            // 1초마다 메모리 상태 업데이트
+            setInterval(updateMemoryStats, 1000);
+        });
+
+        /**
+         * 메모리 사용량 측정
+         */
+        function getMemoryUsage() {
+            if (performance.memory) {
+                return {
+                    used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+                    total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+                    limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
+                };
+            }
+            return null;
+        }
+
+        /**
+         * 메모리 상태 업데이트
+         */
+        function updateMemoryStats() {
+            const memory = getMemoryUsage();
+            const statsDiv = document.getElementById('memory-stats');
+
+            if (memory) {
+                const increase = memory.used - (initialMemory.used || 0);
+                statsDiv.innerHTML = `
+                    <div><strong>사용 중인 메모리:</strong> ${memory.used}MB</div>
+                    <div><strong>할당된 메모리:</strong> ${memory.total}MB</div>
+                    <div><strong>메모리 제한:</strong> ${memory.limit}MB</div>
+                    <div><strong>초기 대비 증가:</strong> ${increase}MB</div>
+                    <div><strong>메모리 사용률:</strong> ${Math.round(memory.used / memory.total * 100)}%</div>
+                    <div><strong>업데이트 시간:</strong> ${new Date().toLocaleTimeString()}</div>
+                `;
+
+                // 메모리 사용량이 높으면 경고
+                if (memory.used / memory.limit > 0.8) {
+                    statsDiv.style.borderLeftColor = '#dc3545';
+                    statsDiv.style.backgroundColor = '#f8d7da';
+                } else if (memory.used / memory.limit > 0.6) {
+                    statsDiv.style.borderLeftColor = '#ffc107';
+                    statsDiv.style.backgroundColor = '#fff3cd';
+                } else {
+                    statsDiv.style.borderLeftColor = '#28a745';
+                    statsDiv.style.backgroundColor = '#d4edda';
+                }
+            } else {
+                statsDiv.innerHTML = '<div>브라우저에서 메모리 정보를 지원하지 않습니다.</div>';
+            }
+        }
+
+        /**
+         * 가비지 컬렉션 강제 실행 (Chrome DevTools 필요)
+         */
+        function forceGC() {
+            if (window.gc) {
+                window.gc();
+                addResult('memory-stats', '가비지 컬렉션이 실행되었습니다.', 'success');
+                setTimeout(updateMemoryStats, 100);
+            } else {
+                addResult('memory-stats', '가비지 컬렉션 함수가 사용할 수 없습니다. Chrome에서 --enable-precise-memory-info 플래그로 실행하세요.', 'warning');
+            }
+        }
+
+        /**
+         * EventManager 테스트
+         */
+        function testEventManager() {
+            const resultsDiv = document.getElementById('eventmanager-results');
+            resultsDiv.innerHTML = '<div class="info">EventManager 테스트 실행 중...</div>';
+
+            const startMemory = getMemoryUsage();
+            const startTime = performance.now();
+
+            try {
+                // 대량의 이벤트 리스너 등록
+                const testElements = [];
+                for (let i = 0; i < 1000; i++) {
+                    const div = document.createElement('div');
+                    div.id = 'test-element-' + i;
+                    document.body.appendChild(div);
+                    testElements.push(div);
+
+                    // EventManager를 통해 이벤트 리스너 등록
+                    eventManager.onClick(div, function() {
+                        console.log('클릭됨: ' + i);
+                    });
+
+                    eventManager.onResize(window, function() {
+                        console.log('리사이즈됨: ' + i);
+                    });
+                }
+
+                const listenerCount = eventManager.getListenerCount();
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                setTimeout(function() {
+                    const endMemory = getMemoryUsage();
+                    const memoryIncrease = endMemory ? endMemory.used - startMemory.used : 0;
+
+                    addResult('eventmanager-results', `EventManager 테스트 완료:`, 'info');
+                    addResult('eventmanager-results', `- 등록된 리스너: ${listenerCount}개`, 'info');
+                    addResult('eventmanager-results', `- 처리 시간: ${processingTime}ms`, 'info');
+                    addResult('eventmanager-results', `- 메모리 증가: ${memoryIncrease}MB`, memoryIncrease > 50 ? 'warning' : 'success');
+
+                    // 테스트 엘리먼트들을 저장해둠 (정리 테스트를 위해)
+                    window.testElements = testElements;
+
+                }, 100);
+
+            } catch (error) {
+                addResult('eventmanager-results', `EventManager 테스트 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * EventManager 정리 테스트
+         */
+        function testEventManagerCleanup() {
+            const resultsDiv = document.getElementById('eventmanager-results');
+
+            const startMemory = getMemoryUsage();
+            const startTime = performance.now();
+
+            try {
+                // 모든 리스너 제거
+                const removedCount = eventManager.removeAllListeners();
+
+                // 테스트 엘리먼트들 DOM에서 제거
+                if (window.testElements) {
+                    window.testElements.forEach(function(element) {
+                        if (element.parentNode) {
+                            element.parentNode.removeChild(element);
+                        }
+                    });
+                    delete window.testElements;
+                }
+
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                setTimeout(function() {
+                    const endMemory = getMemoryUsage();
+                    const memoryDecrease = startMemory ? startMemory.used - endMemory.used : 0;
+
+                    addResult('eventmanager-results', `EventManager 정리 완료:`, 'success');
+                    addResult('eventmanager-results', `- 제거된 리스너: ${removedCount}개`, 'success');
+                    addResult('eventmanager-results', `- 정리 시간: ${processingTime}ms`, 'success');
+                    addResult('eventmanager-results', `- 메모리 감소: ${memoryDecrease}MB`, 'success');
+
+                    // 강제 가비지 컬렉션 시도
+                    if (window.gc) {
+                        window.gc();
+                        setTimeout(function() {
+                            const finalMemory = getMemoryUsage();
+                            const totalDecrease = startMemory ? startMemory.used - finalMemory.used : 0;
+                            addResult('eventmanager-results', `- GC 후 총 메모리 감소: ${totalDecrease}MB`, 'success');
+                        }, 100);
+                    }
+
+                }, 100);
+
+            } catch (error) {
+                addResult('eventmanager-results', `EventManager 정리 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * FileProcessor 테스트
+         */
+        function testFileProcessor() {
+            const resultsDiv = document.getElementById('fileprocessor-results');
+            resultsDiv.innerHTML = '<div class="info">FileProcessor 테스트 실행 중...</div>';
+
+            const startMemory = getMemoryUsage();
+            const startTime = performance.now();
+
+            try {
+                // 가상의 파일 데이터 생성 (5MB)
+                const fileSize = 5 * 1024 * 1024;
+                const fakeFileData = new Uint8Array(fileSize);
+                for (let i = 0; i < fileSize; i++) {
+                    fakeFileData[i] = i % 256;
+                }
+
+                const blob = new Blob([fakeFileData], { type: 'application/vnd.ms-excel' });
+                const file = new File([blob], 'test.xlsx', { type: 'application/vnd.ms-excel' });
+
+                // FileProcessor 상태 확인
+                const status = fileProcessor.getStatus();
+                const workerStatus = fileProcessor.getWorkerStatus();
+
+                addResult('fileprocessor-results', `FileProcessor 상태:`, 'info');
+                addResult('fileprocessor-results', `- 처리 큐 길이: ${status.queueLength}`, 'info');
+                addResult('fileprocessor-results', `- 현재 처리 중: ${status.currentProcessing}`, 'info');
+                addResult('fileprocessor-results', `- 최대 동시 처리: ${status.maxConcurrent}`, 'info');
+                addResult('fileprocessor-results', `- Worker 지원: ${workerStatus.supported}`, 'info');
+
+                // 파일 처리 시뮬레이션
+                fileProcessor.validateFile(file, 'excel');
+
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                setTimeout(function() {
+                    const endMemory = getMemoryUsage();
+                    const memoryIncrease = endMemory ? endMemory.used - startMemory.used : 0;
+
+                    addResult('fileprocessor-results', `FileProcessor 테스트 완료:`, 'success');
+                    addResult('fileprocessor-results', `- 처리 시간: ${processingTime}ms`, 'success');
+                    addResult('fileprocessor-results', `- 메모리 증가: ${memoryIncrease}MB`, memoryIncrease > 10 ? 'warning' : 'success');
+
+                }, 100);
+
+            } catch (error) {
+                addResult('fileprocessor-results', `FileProcessor 테스트 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * FileProcessor 정리 테스트
+         */
+        function testFileProcessorCleanup() {
+            const startMemory = getMemoryUsage();
+            const startTime = performance.now();
+
+            try {
+                // FileProcessor 정리
+                fileProcessor.clearQueue();
+                fileProcessor.destroy();
+
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                setTimeout(function() {
+                    const endMemory = getMemoryUsage();
+                    const memoryDecrease = startMemory ? startMemory.used - endMemory.used : 0;
+
+                    addResult('fileprocessor-results', `FileProcessor 정리 완료:`, 'success');
+                    addResult('fileprocessor-results', `- 정리 시간: ${processingTime}ms`, 'success');
+                    addResult('fileprocessor-results', `- 메모리 감소: ${memoryDecrease}MB`, 'success');
+
+                }, 100);
+
+            } catch (error) {
+                addResult('fileprocessor-results', `FileProcessor 정리 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * WorkerManager 테스트
+         */
+        function testWorkerManager() {
+            const resultsDiv = document.getElementById('workermanager-results');
+            resultsDiv.innerHTML = '<div class="info">WorkerManager 테스트 실행 중...</div>';
+
+            const startMemory = getMemoryUsage();
+
+            try {
+                // WorkerManager 상태 확인
+                const status = workerManager.getStatus();
+
+                addResult('workermanager-results', `WorkerManager 상태:`, 'info');
+                addResult('workermanager-results', `- Worker 지원: ${status.supported}`, 'info');
+                addResult('workermanager-results', `- 총 워커 수: ${status.totalWorkers}`, 'info');
+                addResult('workermanager-results', `- 사용 가능한 워커: ${status.availableWorkers}`, 'info');
+                addResult('workermanager-results', `- 사용 중인 워커: ${status.busyWorkers}`, 'info');
+                addResult('workermanager-results', `- 대기 큐 길이: ${status.queueLength}`, 'info');
+                addResult('workermanager-results', `- 활성 콜백 수: ${status.activeCallbacks}`, 'info');
+
+                setTimeout(function() {
+                    const endMemory = getMemoryUsage();
+                    const memoryIncrease = endMemory ? endMemory.used - startMemory.used : 0;
+
+                    addResult('workermanager-results', `WorkerManager 테스트 완료:`, 'success');
+                    addResult('workermanager-results', `- 메모리 증가: ${memoryIncrease}MB`, memoryIncrease > 5 ? 'warning' : 'success');
+
+                }, 100);
+
+            } catch (error) {
+                addResult('workermanager-results', `WorkerManager 테스트 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * WorkerManager 정리 테스트
+         */
+        function testWorkerManagerCleanup() {
+            const startMemory = getMemoryUsage();
+            const startTime = performance.now();
+
+            try {
+                // WorkerManager 종료
+                workerManager.terminate();
+
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                setTimeout(function() {
+                    const endMemory = getMemoryUsage();
+                    const memoryDecrease = startMemory ? startMemory.used - endMemory.used : 0;
+
+                    addResult('workermanager-results', `WorkerManager 정리 완료:`, 'success');
+                    addResult('workermanager-results', `- 정리 시간: ${processingTime}ms`, 'success');
+                    addResult('workermanager-results', `- 메모리 감소: ${memoryDecrease}MB`, 'success');
+
+                }, 100);
+
+            } catch (error) {
+                addResult('workermanager-results', `WorkerManager 정리 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * StateManager 테스트
+         */
+        function testStateManager() {
+            const resultsDiv = document.getElementById('statemanager-results');
+            resultsDiv.innerHTML = '<div class="info">StateManager 테스트 실행 중...</div>';
+
+            const startMemory = getMemoryUsage();
+            const startTime = performance.now();
+
+            try {
+                // StateManager 정보 확인
+                const info = stateManager.getInfo();
+
+                addResult('statemanager-results', `StateManager 상태:`, 'info');
+                addResult('statemanager-results', `- 상태 크기: ${Math.round(info.stateSize / 1024)}KB`, 'info');
+                addResult('statemanager-results', `- 구독자 수: ${info.subscriberCount}`, 'info');
+                addResult('statemanager-results', `- 히스토리 크기: ${info.historySize}`, 'info');
+                addResult('statemanager-results', `- 히스토리 인덱스: ${info.historyIndex}`, 'info');
+                addResult('statemanager-results', `- Undo 가능: ${info.canUndo}`, 'info');
+                addResult('statemanager-results', `- Redo 가능: ${info.canRedo}`, 'info');
+
+                // 대량의 상태 업데이트 테스트
+                for (let i = 0; i < 100; i++) {
+                    stateManager.updateState('test.data.' + i, {
+                        id: i,
+                        name: 'test' + i,
+                        value: Math.random() * 1000,
+                        timestamp: Date.now()
+                    });
+                }
+
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                setTimeout(function() {
+                    const endMemory = getMemoryUsage();
+                    const memoryIncrease = endMemory ? endMemory.used - startMemory.used : 0;
+                    const finalInfo = stateManager.getInfo();
+
+                    addResult('statemanager-results', `StateManager 테스트 완료:`, 'success');
+                    addResult('statemanager-results', `- 처리 시간: ${processingTime}ms`, 'success');
+                    addResult('statemanager-results', `- 최종 상태 크기: ${Math.round(finalInfo.stateSize / 1024)}KB`, 'info');
+                    addResult('statemanager-results', `- 메모리 증가: ${memoryIncrease}MB`, memoryIncrease > 10 ? 'warning' : 'success');
+
+                }, 100);
+
+            } catch (error) {
+                addResult('statemanager-results', `StateManager 테스트 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * StateManager 정리 테스트
+         */
+        function testStateManagerCleanup() {
+            const startMemory = getMemoryUsage();
+            const startTime = performance.now();
+
+            try {
+                // StateManager 정리
+                stateManager.cleanup();
+
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                setTimeout(function() {
+                    const endMemory = getMemoryUsage();
+                    const memoryDecrease = startMemory ? startMemory.used - endMemory.used : 0;
+                    const finalInfo = stateManager.getInfo();
+
+                    addResult('statemanager-results', `StateManager 정리 완료:`, 'success');
+                    addResult('statemanager-results', `- 정리 시간: ${processingTime}ms`, 'success');
+                    addResult('statemanager-results', `- 최종 구독자 수: ${finalInfo.subscriberCount}`, 'success');
+                    addResult('statemanager-results', `- 최종 히스토리 크기: ${finalInfo.historySize}`, 'success');
+                    addResult('statemanager-results', `- 메모리 감소: ${memoryDecrease}MB`, 'success');
+
+                }, 100);
+
+            } catch (error) {
+                addResult('statemanager-results', `StateManager 정리 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * 대용량 데이터 처리 테스트
+         */
+        function testLargeDataProcessing() {
+            const resultsDiv = document.getElementById('performance-results');
+            resultsDiv.innerHTML = '<div class="info">대용량 데이터 처리 테스트 실행 중...</div>';
+
+            const startMemory = getMemoryUsage();
+            const startTime = performance.now();
+
+            try {
+                // 10만 개의 가상 자재 데이터 생성
+                const materials = [];
+                for (let i = 0; i < 100000; i++) {
+                    materials.push({
+                        id: i,
+                        name: '자재' + i,
+                        category: '카테고리' + (i % 100),
+                        price: Math.random() * 10000,
+                        quantity: Math.floor(Math.random() * 100),
+                        supplier: '공급업체' + (i % 50),
+                        description: '자재 설명 ' + i + ' - 상세 정보가 들어갑니다. 이는 메모리 사용량 테스트를 위한 더미 데이터입니다.',
+                        createdAt: new Date().toISOString()
+                    });
+                }
+
+                // 데이터 처리 시뮬레이션
+                const processedData = materials.map(function(material) {
+                    return {
+                        ...material,
+                        totalValue: material.price * material.quantity,
+                        formatted: material.name + ' - ' + material.category,
+                        processed: true
+                    };
+                });
+
+                // 필터링 작업
+                const filteredData = processedData.filter(function(item) {
+                    return item.totalValue > 1000;
+                });
+
+                // 정렬 작업
+                filteredData.sort(function(a, b) {
+                    return b.totalValue - a.totalValue;
+                });
+
+                const endTime = performance.now();
+                const processingTime = Math.round(endTime - startTime);
+
+                setTimeout(function() {
+                    const endMemory = getMemoryUsage();
+                    const memoryIncrease = endMemory ? endMemory.used - startMemory.used : 0;
+
+                    addResult('performance-results', `대용량 데이터 처리 완료:`, 'success');
+                    addResult('performance-results', `- 원본 데이터: ${materials.length.toLocaleString()}개`, 'info');
+                    addResult('performance-results', `- 처리된 데이터: ${processedData.length.toLocaleString()}개`, 'info');
+                    addResult('performance-results', `- 필터링 결과: ${filteredData.length.toLocaleString()}개`, 'info');
+                    addResult('performance-results', `- 처리 시간: ${processingTime}ms`, processingTime > 5000 ? 'warning' : 'success');
+                    addResult('performance-results', `- 메모리 증가: ${memoryIncrease}MB`, memoryIncrease > 100 ? 'warning' : 'success');
+
+                    // 메모리 정리
+                    setTimeout(function() {
+                        // 변수들을 null로 설정하여 가비지 컬렉션 대상으로 만들기
+                        materials.length = 0;
+                        processedData.length = 0;
+                        filteredData.length = 0;
+
+                        if (window.gc) {
+                            window.gc();
+                            setTimeout(function() {
+                                const cleanupMemory = getMemoryUsage();
+                                const memoryRecovered = endMemory ? endMemory.used - cleanupMemory.used : 0;
+                                addResult('performance-results', `- 메모리 정리 후 회수: ${memoryRecovered}MB`, 'success');
+                            }, 100);
+                        }
+                    }, 1000);
+
+                }, 100);
+
+            } catch (error) {
+                addResult('performance-results', `대용량 데이터 처리 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * 청크 처리 테스트
+         */
+        function testChunkProcessing() {
+            const resultsDiv = document.getElementById('performance-results');
+
+            const startMemory = getMemoryUsage();
+            const startTime = performance.now();
+
+            try {
+                addResult('performance-results', '청크 처리 테스트 시작...', 'info');
+
+                // 20MB 가상 파일 데이터
+                const totalSize = 20 * 1024 * 1024;
+                const chunkSize = 2 * 1024 * 1024; // 2MB 청크
+                const chunks = Math.ceil(totalSize / chunkSize);
+
+                let processedChunks = 0;
+
+                function processChunk(index) {
+                    return new Promise(function(resolve) {
+                        // 청크 데이터 시뮬레이션
+                        const currentChunkSize = Math.min(chunkSize, totalSize - (index * chunkSize));
+                        const chunkData = new Uint8Array(currentChunkSize);
+
+                        // 데이터 채우기
+                        for (let i = 0; i < currentChunkSize; i++) {
+                            chunkData[i] = (index * chunkSize + i) % 256;
+                        }
+
+                        // 청크 처리 시뮬레이션 (체크섬 계산)
+                        let checksum = 0;
+                        for (let i = 0; i < Math.min(1024, currentChunkSize); i++) {
+                            checksum = ((checksum << 5) - checksum + chunkData[i]) & 0xffffffff;
+                        }
+
+                        processedChunks++;
+                        const progress = Math.round((processedChunks / chunks) * 100);
+
+                        addResult('performance-results', `청크 ${index + 1}/${chunks} 처리 완료 (${progress}%) - 체크섬: ${checksum.toString(16)}`, 'info');
+
+                        // 메모리 해제를 위해 짧은 지연
+                        setTimeout(function() {
+                            resolve();
+                        }, 10);
+                    });
+                }
+
+                // 순차적으로 청크 처리
+                let promise = Promise.resolve();
+                for (let i = 0; i < chunks; i++) {
+                    promise = promise.then(function(index) {
+                        return function() {
+                            return processChunk(index);
+                        };
+                    }(i));
+                }
+
+                promise.then(function() {
+                    const endTime = performance.now();
+                    const processingTime = Math.round(endTime - startTime);
+
+                    setTimeout(function() {
+                        const endMemory = getMemoryUsage();
+                        const memoryIncrease = endMemory ? endMemory.used - startMemory.used : 0;
+
+                        addResult('performance-results', `청크 처리 테스트 완료:`, 'success');
+                        addResult('performance-results', `- 총 데이터 크기: ${totalSize / 1024 / 1024}MB`, 'info');
+                        addResult('performance-results', `- 청크 크기: ${chunkSize / 1024 / 1024}MB`, 'info');
+                        addResult('performance-results', `- 처리된 청크: ${processedChunks}/${chunks}`, 'success');
+                        addResult('performance-results', `- 총 처리 시간: ${processingTime}ms`, processingTime > 10000 ? 'warning' : 'success');
+                        addResult('performance-results', `- 평균 청크 처리 시간: ${Math.round(processingTime / chunks)}ms`, 'info');
+                        addResult('performance-results', `- 메모리 증가: ${memoryIncrease}MB`, memoryIncrease > 50 ? 'warning' : 'success');
+
+                    }, 100);
+                });
+
+            } catch (error) {
+                addResult('performance-results', `청크 처리 테스트 실패: ${error.message}`, 'error');
+            }
+        }
+
+        /**
+         * 결과 추가 헬퍼 함수
+         */
+        function addResult(containerId, message, type) {
+            const container = document.getElementById(containerId);
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-result ' + type;
+            resultDiv.textContent = message;
+            container.appendChild(resultDiv);
+
+            // 자동 스크롤
+            resultDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    </script>
+</body>
+</html>

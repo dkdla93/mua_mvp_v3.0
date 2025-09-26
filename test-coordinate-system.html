@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResponsiveCoordinateSystem 종합 테스트</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f6fa;
+            padding: 20px;
+        }
+
+        .test-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .test-header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .test-section {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .test-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+
+        .test-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .coordinate-test-area {
+            position: relative;
+            background: #ecf0f1;
+            border: 2px dashed #bdc3c7;
+            min-height: 400px;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .placed-item {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #e74c3c;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: move;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border: 2px solid white;
+            font-size: 12px;
+        }
+
+        .minimap-box {
+            position: absolute;
+            border: 2px solid #f39c12;
+            background: rgba(243, 156, 18, 0.2);
+            min-width: 20px;
+            min-height: 20px;
+            cursor: move;
+        }
+
+        .material-badge {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            border: 2px solid white;
+            z-index: 10;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #2ecc71; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-info { background: #17a2b8; color: white; }
+
+        .btn:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
+        }
+
+        .test-results {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+        }
+
+        .performance-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .metric-card {
+            background: #34495e;
+            color: white;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .drag-source {
+            background: #3498db;
+            color: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .drag-source:active {
+            cursor: grabbing;
+        }
+
+        .drop-target {
+            border: 2px dashed #95a5a6;
+            min-height: 100px;
+            padding: 20px;
+            text-align: center;
+            color: #7f8c8d;
+            background: #ecf0f1;
+            border-radius: 4px;
+        }
+
+        .drop-target.drag-over {
+            border-color: #3498db;
+            background: #e8f4fd;
+            color: #3498db;
+        }
+
+        #minimap-workspace-content {
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300"><rect width="400" height="300" fill="%23f8f9fa" stroke="%23dee2e6" stroke-width="2"/><text x="200" y="150" text-anchor="middle" fill="%236c757d" font-family="Arial" font-size="14">미니맵 영역 (400x300)</text></svg>');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+        }
+
+        #scene-workspace-content {
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400"><rect width="600" height="400" fill="%23e9ecef" stroke="%236c757d" stroke-width="2"/><text x="300" y="200" text-anchor="middle" fill="%23495057" font-family="Arial" font-size="16">장면 이미지 영역 (600x400)</text></svg>');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+        }
+
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 20px;
+            height: 20px;
+            background: #3498db;
+            cursor: se-resize;
+            border-radius: 4px 0 0 0;
+        }
+
+        .size-info {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            z-index: 100;
+        }
+
+        @media (max-width: 768px) {
+            .test-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>ResponsiveCoordinateSystem & 드래그앤드롭 종합 테스트</h1>
+            <p>정규화된 좌표 시스템, ResizeObserver, 드래그앤드롭 통합 기능을 테스트합니다.</p>
+        </div>
+
+        <!-- 1. 좌표 시스템 기본 테스트 -->
+        <div class="test-section">
+            <h3>1. ResponsiveCoordinateSystem 기본 기능 테스트</h3>
+            <div class="test-grid">
+                <div>
+                    <h4>미니맵 좌표 시스템 (minDimensions: 300x200)</h4>
+                    <div class="controls">
+                        <button class="btn btn-primary" onclick="testCoordinates('minimap')">좌표 테스트</button>
+                        <button class="btn btn-success" onclick="addRandomItem('minimap')">랜덤 아이템 추가</button>
+                        <button class="btn btn-warning" onclick="resizeContainer('minimap', 500, 300)">크기 변경 (500x300)</button>
+                        <button class="btn btn-info" onclick="debugSystem('minimap')">디버그 정보</button>
+                        <button class="btn btn-danger" onclick="clearItems('minimap')">모든 아이템 제거</button>
+                    </div>
+                    <div id="minimap-workspace-content" class="coordinate-test-area" style="height: 250px; position: relative;">
+                        <div class="size-info" id="minimap-size-info"></div>
+                        <div class="resize-handle" data-target="minimap-workspace-content"></div>
+                    </div>
+                </div>
+                <div>
+                    <h4>장면 좌표 시스템 (minDimensions: 400x300)</h4>
+                    <div class="controls">
+                        <button class="btn btn-primary" onclick="testCoordinates('scene')">좌표 테스트</button>
+                        <button class="btn btn-success" onclick="addRandomItem('scene')">랜덤 아이템 추가</button>
+                        <button class="btn btn-warning" onclick="resizeContainer('scene', 700, 500)">크기 변경 (700x500)</button>
+                        <button class="btn btn-info" onclick="debugSystem('scene')">디버그 정보</button>
+                        <button class="btn btn-danger" onclick="clearItems('scene')">모든 아이템 제거</button>
+                    </div>
+                    <div id="scene-workspace-content" class="coordinate-test-area" style="height: 350px; position: relative;">
+                        <div class="size-info" id="scene-size-info"></div>
+                        <div class="resize-handle" data-target="scene-workspace-content"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 드래그앤드롭 통합 테스트 -->
+        <div class="test-section">
+            <h3>2. 드래그앤드롭 통합 테스트</h3>
+            <div class="test-grid">
+                <div>
+                    <h4>드래그 소스</h4>
+                    <div class="drag-source" draggable="true" data-material="콘크리트" data-index="0">콘크리트 (드래그 가능)</div>
+                    <div class="drag-source" draggable="true" data-material="철근" data-index="1">철근 (드래그 가능)</div>
+                    <div class="drag-source" draggable="true" data-material="목재" data-index="2">목재 (드래그 가능)</div>
+                    <div class="drag-source" draggable="true" data-material="타일" data-index="3">타일 (드래그 가능)</div>
+                    <div class="drag-source" draggable="true" data-material="페인트" data-index="4">페인트 (드래그 가능)</div>
+                </div>
+                <div>
+                    <h4>드롭 타겟 (장면 이미지)</h4>
+                    <div id="scene-drop-target" class="drop-target" style="height: 200px; position: relative;">
+                        여기에 자재를 드래그해서 놓으세요
+                        <div class="size-info" id="drop-target-size-info"></div>
+                    </div>
+                    <div class="controls" style="margin-top: 10px;">
+                        <button class="btn btn-danger" onclick="clearDroppedItems()">배치된 자재 모두 제거</button>
+                        <button class="btn btn-info" onclick="showDroppedItems()">배치된 자재 정보</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 성능 및 최적화 테스트 -->
+        <div class="test-section">
+            <h3>3. 성능 및 최적화 테스트</h3>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="performanceTest()">성능 테스트 시작</button>
+                <button class="btn btn-success" onclick="throttleTest()">스로틀링 테스트</button>
+                <button class="btn btn-warning" onclick="memoryLeakTest()">메모리 누수 테스트</button>
+                <button class="btn btn-info" onclick="resizeObserverTest()">ResizeObserver 테스트</button>
+                <button class="btn btn-danger" onclick="stressTest()">스트레스 테스트</button>
+            </div>
+
+            <div class="performance-metrics">
+                <div class="metric-card">
+                    <div class="metric-value" id="coordinate-operations">0</div>
+                    <div>좌표 변환 연산</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="resize-events">0</div>
+                    <div>리사이즈 이벤트</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="drag-operations">0</div>
+                    <div>드래그 연산</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="memory-usage">0MB</div>
+                    <div>추정 메모리 사용량</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. 테스트 결과 로그 -->
+        <div class="test-section">
+            <h3>4. 테스트 결과 및 로그</h3>
+            <div class="controls">
+                <button class="btn btn-success" onclick="clearLog()">로그 지우기</button>
+                <button class="btn btn-info" onclick="saveTestReport()">테스트 보고서 저장</button>
+            </div>
+            <div id="test-results" class="test-results"></div>
+        </div>
+    </div>
+
+    <!-- ResponsiveCoordinateSystem 로드 -->
+    <script src="js/utils/coordinate-system.js"></script>
+
+    <script>
+        // 테스트 환경 초기화
+        let testState = {
+            coordinateSystems: new Map(),
+            performanceMetrics: {
+                coordinateOperations: 0,
+                resizeEvents: 0,
+                dragOperations: 0,
+                memoryUsage: 0
+            },
+            itemCounter: 1,
+            droppedItems: []
+        };
+
+        // 로그 함수
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('test-results');
+            const colorMap = {
+                'info': '#3498db',
+                'success': '#2ecc71',
+                'warning': '#f39c12',
+                'error': '#e74c3c'
+            };
+
+            logElement.innerHTML += `<div style="color: ${colorMap[type] || '#fff'};">[${timestamp}] ${message}</div>`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('test-results').innerHTML = '';
+        }
+
+        // 좌표 시스템 초기화
+        function initializeCoordinateSystems() {
+            log('좌표 시스템 초기화 시작...', 'info');
+
+            // 미니맵 좌표 시스템
+            const minimapContainer = document.getElementById('minimap-workspace-content');
+            const minimapSystem = new ResponsiveCoordinateSystem(minimapContainer, {
+                enableResizeObserver: true,
+                throttleDelay: 100,
+                itemSelector: '.minimap-box',
+                dataPrefix: 'normal',
+                minDimensions: { width: 300, height: 200 }
+            });
+            testState.coordinateSystems.set('minimap', minimapSystem);
+
+            // 장면 좌표 시스템
+            const sceneContainer = document.getElementById('scene-workspace-content');
+            const sceneSystem = new ResponsiveCoordinateSystem(sceneContainer, {
+                enableResizeObserver: true,
+                throttleDelay: 100,
+                itemSelector: '.material-badge',
+                dataPrefix: 'normal',
+                minDimensions: { width: 400, height: 300 }
+            });
+            testState.coordinateSystems.set('scene', sceneSystem);
+
+            log('좌표 시스템 초기화 완료', 'success');
+            updateSizeInfo();
+        }
+
+        // 크기 정보 업데이트
+        function updateSizeInfo() {
+            const minimapSystem = testState.coordinateSystems.get('minimap');
+            const sceneSystem = testState.coordinateSystems.get('scene');
+
+            if (minimapSystem) {
+                const dims = minimapSystem.getDimensions();
+                document.getElementById('minimap-size-info').textContent =
+                    `${Math.round(dims.width)}x${Math.round(dims.height)}`;
+            }
+
+            if (sceneSystem) {
+                const dims = sceneSystem.getDimensions();
+                document.getElementById('scene-size-info').textContent =
+                    `${Math.round(dims.width)}x${Math.round(dims.height)}`;
+            }
+
+            // 드롭 타겟 크기 정보
+            const dropTarget = document.getElementById('scene-drop-target');
+            const rect = dropTarget.getBoundingClientRect();
+            document.getElementById('drop-target-size-info').textContent =
+                `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+        }
+
+        // 좌표 테스트
+        function testCoordinates(systemType) {
+            const system = testState.coordinateSystems.get(systemType);
+            if (!system) {
+                log(`좌표 시스템 '${systemType}'을 찾을 수 없습니다.`, 'error');
+                return;
+            }
+
+            log(`'${systemType}' 좌표 테스트 시작...`, 'info');
+
+            // 테스트 좌표들
+            const testCoords = [
+                { x: 0, y: 0, desc: '좌상단' },
+                { x: system.width, y: system.height, desc: '우하단' },
+                { x: system.width / 2, y: system.height / 2, desc: '중앙' },
+                { x: system.width * 0.25, y: system.height * 0.75, desc: '1/4, 3/4' }
+            ];
+
+            testCoords.forEach(coord => {
+                const normalized = system.normalizeCoordinates(coord.x, coord.y);
+                const denormalized = system.denormalizeCoordinates(normalized.normalX, normalized.normalY);
+
+                const pixelError = Math.abs(coord.x - denormalized.x) + Math.abs(coord.y - denormalized.y);
+
+                log(`${coord.desc}: (${coord.x}, ${coord.y}) → (${normalized.normalX.toFixed(3)}, ${normalized.normalY.toFixed(3)}) → (${denormalized.x.toFixed(1)}, ${denormalized.y.toFixed(1)}) [오차: ${pixelError.toFixed(1)}px]`,
+                    pixelError < 0.1 ? 'success' : 'warning');
+
+                testState.performanceMetrics.coordinateOperations++;
+            });
+
+            updateMetrics();
+        }
+
+        // 랜덤 아이템 추가
+        function addRandomItem(systemType) {
+            const system = testState.coordinateSystems.get(systemType);
+            if (!system) return;
+
+            const container = systemType === 'minimap' ?
+                document.getElementById('minimap-workspace-content') :
+                document.getElementById('scene-workspace-content');
+
+            // 랜덤 좌표 생성
+            const randomX = Math.random() * (system.width - 30);
+            const randomY = Math.random() * (system.height - 30);
+
+            // 아이템 생성
+            const item = document.createElement('div');
+            item.className = systemType === 'minimap' ? 'minimap-box placed-item' : 'material-badge placed-item';
+            item.textContent = testState.itemCounter++;
+
+            // 좌표 시스템을 통해 위치 설정
+            system.setItemPosition(item, randomX, randomY);
+            container.appendChild(item);
+
+            // 클릭 이벤트 (아이템 정보 표시)
+            item.addEventListener('click', function() {
+                const pos = system.getItemPosition(item);
+                log(`아이템 #${item.textContent} 클릭: 픽셀(${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}), 정규화(${pos.normalX.toFixed(3)}, ${pos.normalY.toFixed(3)})`, 'info');
+            });
+
+            log(`'${systemType}'에 아이템 #${item.textContent} 추가: (${randomX.toFixed(1)}, ${randomY.toFixed(1)})`, 'success');
+        }
+
+        // 컨테이너 크기 변경
+        function resizeContainer(systemType, width, height) {
+            const containerId = systemType === 'minimap' ? 'minimap-workspace-content' : 'scene-workspace-content';
+            const container = document.getElementById(containerId);
+
+            container.style.width = width + 'px';
+            container.style.height = height + 'px';
+
+            log(`'${systemType}' 컨테이너 크기 변경: ${width}x${height}`, 'info');
+
+            // 크기 변경 후 정보 업데이트
+            setTimeout(updateSizeInfo, 150);
+        }
+
+        // 시스템 디버그 정보
+        function debugSystem(systemType) {
+            const system = testState.coordinateSystems.get(systemType);
+            if (!system) return;
+
+            system.debugInfo();
+            const dims = system.getDimensions();
+            log(`'${systemType}' 디버그: width=${dims.width}, height=${dims.height}, offsetX=${dims.offsetX}, offsetY=${dims.offsetY}`, 'info');
+        }
+
+        // 아이템 제거
+        function clearItems(systemType) {
+            const containerId = systemType === 'minimap' ? 'minimap-workspace-content' : 'scene-workspace-content';
+            const container = document.getElementById(containerId);
+            const items = container.querySelectorAll('.placed-item');
+
+            items.forEach(item => item.remove());
+            log(`'${systemType}'의 모든 아이템 제거 (${items.length}개)`, 'warning');
+        }
+
+        // 드래그앤드롭 초기화
+        function initializeDragDrop() {
+            log('드래그앤드롭 시스템 초기화...', 'info');
+
+            // 드래그 소스 설정
+            const dragSources = document.querySelectorAll('.drag-source');
+            dragSources.forEach(source => {
+                source.addEventListener('dragstart', function(e) {
+                    const materialName = e.target.dataset.material;
+                    const materialIndex = e.target.dataset.index;
+
+                    e.dataTransfer.setData('text/plain', JSON.stringify({
+                        name: materialName,
+                        index: parseInt(materialIndex)
+                    }));
+
+                    e.target.style.opacity = '0.5';
+                    log(`드래그 시작: ${materialName}`, 'info');
+                    testState.performanceMetrics.dragOperations++;
+                });
+
+                source.addEventListener('dragend', function(e) {
+                    e.target.style.opacity = '1';
+                    log(`드래그 종료: ${e.target.dataset.material}`, 'info');
+                });
+            });
+
+            // 드롭 타겟 설정
+            const dropTarget = document.getElementById('scene-drop-target');
+
+            dropTarget.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                dropTarget.classList.add('drag-over');
+            });
+
+            dropTarget.addEventListener('dragleave', function(e) {
+                if (!dropTarget.contains(e.relatedTarget)) {
+                    dropTarget.classList.remove('drag-over');
+                }
+            });
+
+            dropTarget.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dropTarget.classList.remove('drag-over');
+
+                try {
+                    const materialData = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    const rect = dropTarget.getBoundingClientRect();
+                    const dropX = e.clientX - rect.left;
+                    const dropY = e.clientY - rect.top;
+
+                    // 정규화 좌표 계산
+                    const normalizedX = Math.max(0, Math.min(1, dropX / rect.width));
+                    const normalizedY = Math.max(0, Math.min(1, dropY / rect.height));
+
+                    // 자재 배지 생성
+                    const badge = document.createElement('div');
+                    badge.className = 'material-badge';
+                    badge.textContent = testState.itemCounter++;
+                    badge.title = materialData.name;
+                    badge.style.left = (normalizedX * 100) + '%';
+                    badge.style.top = (normalizedY * 100) + '%';
+                    badge.style.transform = 'translate(-50%, -50%)';
+
+                    // 정규화 좌표를 data 속성에 저장
+                    badge.dataset.normalX = normalizedX.toString();
+                    badge.dataset.normalY = normalizedY.toString();
+                    badge.dataset.materialName = materialData.name;
+                    badge.dataset.materialIndex = materialData.index.toString();
+
+                    dropTarget.appendChild(badge);
+
+                    // 배치 정보 저장
+                    testState.droppedItems.push({
+                        id: badge.textContent,
+                        name: materialData.name,
+                        normalizedX: normalizedX,
+                        normalizedY: normalizedY,
+                        pixelX: dropX,
+                        pixelY: dropY
+                    });
+
+                    log(`자재 배치: ${materialData.name} at (${normalizedX.toFixed(3)}, ${normalizedY.toFixed(3)})`, 'success');
+                    testState.performanceMetrics.dragOperations++;
+                    updateMetrics();
+
+                } catch (error) {
+                    log(`드롭 처리 오류: ${error.message}`, 'error');
+                }
+            });
+
+            log('드래그앤드롭 시스템 초기화 완료', 'success');
+        }
+
+        // 배치된 자재 제거
+        function clearDroppedItems() {
+            const dropTarget = document.getElementById('scene-drop-target');
+            const badges = dropTarget.querySelectorAll('.material-badge');
+
+            badges.forEach(badge => badge.remove());
+            testState.droppedItems = [];
+
+            log(`배치된 자재 ${badges.length}개 모두 제거`, 'warning');
+        }
+
+        // 배치된 자재 정보 표시
+        function showDroppedItems() {
+            if (testState.droppedItems.length === 0) {
+                log('배치된 자재가 없습니다.', 'warning');
+                return;
+            }
+
+            log(`=== 배치된 자재 정보 (${testState.droppedItems.length}개) ===`, 'info');
+            testState.droppedItems.forEach(item => {
+                log(`#${item.id}: ${item.name} - 정규화(${item.normalizedX.toFixed(3)}, ${item.normalizedY.toFixed(3)}) 픽셀(${item.pixelX.toFixed(1)}, ${item.pixelY.toFixed(1)})`, 'info');
+            });
+        }
+
+        // 성능 테스트
+        function performanceTest() {
+            log('=== 성능 테스트 시작 ===', 'info');
+
+            const iterations = 1000;
+            const system = testState.coordinateSystems.get('scene');
+            if (!system) return;
+
+            const startTime = performance.now();
+
+            // 좌표 변환 성능 테스트
+            for (let i = 0; i < iterations; i++) {
+                const x = Math.random() * system.width;
+                const y = Math.random() * system.height;
+                const normalized = system.normalizeCoordinates(x, y);
+                const denormalized = system.denormalizeCoordinates(normalized.normalX, normalized.normalY);
+                testState.performanceMetrics.coordinateOperations++;
+            }
+
+            const endTime = performance.now();
+            const duration = endTime - startTime;
+
+            log(`좌표 변환 ${iterations}회 실행 시간: ${duration.toFixed(2)}ms (평균: ${(duration/iterations).toFixed(4)}ms)`, 'success');
+            updateMetrics();
+        }
+
+        // 스로틀링 테스트
+        function throttleTest() {
+            log('=== 스로틀링 테스트 시작 ===', 'info');
+
+            const system = testState.coordinateSystems.get('scene');
+            if (!system) return;
+
+            let eventCount = 0;
+            let actualCalls = 0;
+
+            // 테스트용 스로틀 함수 생성
+            const throttledFunction = system.throttle(function() {
+                actualCalls++;
+            }, 100);
+
+            // 빠른 속도로 함수 호출
+            const interval = setInterval(() => {
+                throttledFunction();
+                eventCount++;
+                testState.performanceMetrics.resizeEvents++;
+            }, 10);
+
+            // 2초 후 중단
+            setTimeout(() => {
+                clearInterval(interval);
+                log(`스로틀링 테스트 결과: ${eventCount}회 호출 → ${actualCalls}회 실행 (${((actualCalls/eventCount)*100).toFixed(1)}% 실행률)`, 'success');
+                updateMetrics();
+            }, 2000);
+        }
+
+        // ResizeObserver 테스트
+        function resizeObserverTest() {
+            log('=== ResizeObserver 테스트 시작 ===', 'info');
+
+            const container = document.getElementById('scene-workspace-content');
+            let resizeCount = 0;
+
+            // 크기 변경 시뮬레이션
+            const sizes = [
+                { width: 400, height: 300 },
+                { width: 500, height: 400 },
+                { width: 600, height: 350 },
+                { width: 450, height: 320 }
+            ];
+
+            let index = 0;
+            const resizeInterval = setInterval(() => {
+                const size = sizes[index];
+                container.style.width = size.width + 'px';
+                container.style.height = size.height + 'px';
+
+                log(`크기 변경: ${size.width}x${size.height}`, 'info');
+                resizeCount++;
+                index++;
+
+                if (index >= sizes.length) {
+                    clearInterval(resizeInterval);
+                    setTimeout(() => {
+                        log(`ResizeObserver 테스트 완료: ${resizeCount}회 크기 변경`, 'success');
+                        updateSizeInfo();
+                    }, 200);
+                }
+            }, 300);
+        }
+
+        // 스트레스 테스트
+        function stressTest() {
+            log('=== 스트레스 테스트 시작 ===', 'info');
+
+            const startTime = performance.now();
+
+            // 대량의 아이템 생성
+            for (let i = 0; i < 100; i++) {
+                addRandomItem('scene');
+                addRandomItem('minimap');
+            }
+
+            // 크기 변경 시뮬레이션
+            let resizeCount = 0;
+            const resizeInterval = setInterval(() => {
+                const width = 400 + Math.random() * 300;
+                const height = 300 + Math.random() * 200;
+                resizeContainer('scene', width, height);
+                resizeContainer('minimap', width * 0.7, height * 0.7);
+                resizeCount++;
+
+                if (resizeCount >= 20) {
+                    clearInterval(resizeInterval);
+                    const endTime = performance.now();
+                    log(`스트레스 테스트 완료: ${(endTime - startTime).toFixed(2)}ms`, 'success');
+                }
+            }, 50);
+        }
+
+        // 메모리 누수 테스트
+        function memoryLeakTest() {
+            log('=== 메모리 누수 테스트 시작 ===', 'info');
+
+            // 임시 좌표 시스템 생성 및 제거
+            for (let i = 0; i < 10; i++) {
+                const tempContainer = document.createElement('div');
+                tempContainer.style.width = '200px';
+                tempContainer.style.height = '200px';
+                document.body.appendChild(tempContainer);
+
+                const tempSystem = new ResponsiveCoordinateSystem(tempContainer, {
+                    enableResizeObserver: true,
+                    throttleDelay: 50
+                });
+
+                // 일부 작업 수행
+                tempSystem.normalizeCoordinates(100, 100);
+                tempSystem.denormalizeCoordinates(0.5, 0.5);
+
+                // 시스템 정리
+                tempSystem.destroy();
+                document.body.removeChild(tempContainer);
+            }
+
+            log('메모리 누수 테스트 완료: 10개 임시 시스템 생성/제거', 'success');
+        }
+
+        // 메트릭 업데이트
+        function updateMetrics() {
+            document.getElementById('coordinate-operations').textContent = testState.performanceMetrics.coordinateOperations;
+            document.getElementById('resize-events').textContent = testState.performanceMetrics.resizeEvents;
+            document.getElementById('drag-operations').textContent = testState.performanceMetrics.dragOperations;
+
+            // 추정 메모리 사용량 (매우 대략적)
+            const estimatedMemory = (testState.performanceMetrics.coordinateOperations * 0.001 +
+                                   testState.droppedItems.length * 0.1 +
+                                   testState.coordinateSystems.size * 5).toFixed(1);
+            document.getElementById('memory-usage').textContent = estimatedMemory + 'MB';
+            testState.performanceMetrics.memoryUsage = parseFloat(estimatedMemory);
+        }
+
+        // 테스트 보고서 저장
+        function saveTestReport() {
+            const report = {
+                timestamp: new Date().toISOString(),
+                performanceMetrics: testState.performanceMetrics,
+                droppedItems: testState.droppedItems,
+                systemCount: testState.coordinateSystems.size,
+                testLog: document.getElementById('test-results').textContent
+            };
+
+            const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `coordinate-system-test-report-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            log('테스트 보고서 저장 완료', 'success');
+        }
+
+        // 크기 조절 핸들 기능
+        function initializeResizeHandles() {
+            document.querySelectorAll('.resize-handle').forEach(handle => {
+                let isResizing = false;
+                let startX, startY, startWidth, startHeight, target;
+
+                handle.addEventListener('mousedown', function(e) {
+                    isResizing = true;
+                    const targetId = handle.dataset.target;
+                    target = document.getElementById(targetId);
+                    const rect = target.getBoundingClientRect();
+
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startWidth = rect.width;
+                    startHeight = rect.height;
+
+                    e.preventDefault();
+                });
+
+                document.addEventListener('mousemove', function(e) {
+                    if (!isResizing) return;
+
+                    const width = Math.max(200, startWidth + (e.clientX - startX));
+                    const height = Math.max(150, startHeight + (e.clientY - startY));
+
+                    target.style.width = width + 'px';
+                    target.style.height = height + 'px';
+
+                    updateSizeInfo();
+                });
+
+                document.addEventListener('mouseup', function() {
+                    if (isResizing) {
+                        isResizing = false;
+                        log(`컨테이너 크기 조절 완료: ${target.id}`, 'info');
+                    }
+                });
+            });
+        }
+
+        // 페이지 로드 시 초기화
+        window.addEventListener('load', function() {
+            log('페이지 로드 완료, 테스트 환경 초기화 시작', 'info');
+
+            initializeCoordinateSystems();
+            initializeDragDrop();
+            initializeResizeHandles();
+
+            // 주기적으로 크기 정보 업데이트
+            setInterval(updateSizeInfo, 1000);
+
+            log('모든 초기화 완료, 테스트를 시작할 수 있습니다!', 'success');
+        });
+
+        // 페이지 언로드 시 정리
+        window.addEventListener('beforeunload', function() {
+            testState.coordinateSystems.forEach(system => {
+                system.destroy();
+            });
+            log('페이지 언로드: 모든 좌표 시스템 정리됨', 'info');
+        });
+    </script>
+</body>
+</html>

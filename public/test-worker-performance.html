@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Worker 성능 및 안정성 테스트</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .test-controls {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            margin: 0 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .btn.success {
+            background: #27ae60;
+        }
+
+        .btn.danger {
+            background: #e74c3c;
+        }
+
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .status.running {
+            background: #f39c12;
+            color: white;
+        }
+
+        .status.success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .status.error {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #ecf0f1;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2980b9);
+            transition: width 0.3s ease;
+        }
+
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .test-result {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #3498db;
+        }
+
+        .test-result.success {
+            border-left-color: #27ae60;
+        }
+
+        .test-result.error {
+            border-left-color: #e74c3c;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .metric-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        .log-output {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .score-circle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 0 auto 10px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Web Worker 시스템 성능 및 안정성 테스트</h1>
+
+        <div class="test-controls">
+            <button id="runAllTests" class="btn">전체 테스트 실행</button>
+            <button id="runWorkerTests" class="btn">WorkerManager 테스트</button>
+            <button id="runPerformanceTests" class="btn">성능 테스트</button>
+            <button id="runFallbackTests" class="btn">폴백 테스트</button>
+            <button id="runStabilityTests" class="btn">안정성 테스트</button>
+            <button id="clearResults" class="btn">결과 지우기</button>
+        </div>
+
+        <div id="testStatus" class="hidden"></div>
+        <div id="progressContainer" class="hidden">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <div id="progressText" style="text-align: center; margin-top: 5px;">준비 중...</div>
+        </div>
+
+        <div id="summarySection" class="hidden">
+            <div class="summary-card">
+                <div class="score-circle" id="overallScore">-</div>
+                <h3 style="text-align: center; margin: 0;">전체 테스트 점수</h3>
+                <div id="summaryText" style="text-align: center; margin-top: 10px;"></div>
+            </div>
+        </div>
+
+        <div id="metricsSection" class="hidden">
+            <h2>시스템 메트릭</h2>
+            <div class="metrics-grid" id="metricsGrid"></div>
+        </div>
+
+        <div id="workerManagerResults" class="test-section hidden">
+            <h2>WorkerManager 기능 테스트 결과</h2>
+            <div id="workerManagerContent"></div>
+        </div>
+
+        <div id="performanceResults" class="test-section hidden">
+            <h2>성능 벤치마크 테스트 결과</h2>
+            <div id="performanceContent"></div>
+        </div>
+
+        <div id="fallbackResults" class="test-section hidden">
+            <h2>폴백 메커니즘 테스트 결과</h2>
+            <div id="fallbackContent"></div>
+        </div>
+
+        <div id="stabilityResults" class="test-section hidden">
+            <h2>안정성 및 부하 테스트 결과</h2>
+            <div id="stabilityContent"></div>
+        </div>
+
+        <div id="logOutput" class="log-output hidden"></div>
+
+        <div id="rawResults" class="test-section hidden">
+            <h2>원시 테스트 데이터</h2>
+            <pre id="rawResultsContent"></pre>
+        </div>
+    </div>
+
+    <!-- 필수 라이브러리 로드 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/utils/worker-manager.js"></script>
+    <script src="js/test/worker-performance-test.js"></script>
+
+    <script>
+        'use strict';
+
+        // 테스트 UI 관리자
+        var TestUI = {
+            currentTest: null,
+            testResults: null,
+            logMessages: [],
+
+            init: function() {
+                this.bindEvents();
+                this.setupConsoleCapture();
+                this.updateSystemMetrics();
+            },
+
+            bindEvents: function() {
+                document.getElementById('runAllTests').addEventListener('click', this.runAllTests.bind(this));
+                document.getElementById('runWorkerTests').addEventListener('click', this.runWorkerTests.bind(this));
+                document.getElementById('runPerformanceTests').addEventListener('click', this.runPerformanceTests.bind(this));
+                document.getElementById('runFallbackTests').addEventListener('click', this.runFallbackTests.bind(this));
+                document.getElementById('runStabilityTests').addEventListener('click', this.runStabilityTests.bind(this));
+                document.getElementById('clearResults').addEventListener('click', this.clearResults.bind(this));
+            },
+
+            setupConsoleCapture: function() {
+                var originalLog = console.log;
+                var self = this;
+
+                console.log = function() {
+                    originalLog.apply(console, arguments);
+
+                    var message = Array.prototype.slice.call(arguments).map(function(arg) {
+                        return typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg);
+                    }).join(' ');
+
+                    self.addLogMessage(new Date().toLocaleTimeString() + ' - ' + message);
+                };
+            },
+
+            addLogMessage: function(message) {
+                this.logMessages.push(message);
+                if (this.logMessages.length > 100) {
+                    this.logMessages.shift();
+                }
+                this.updateLogOutput();
+            },
+
+            updateLogOutput: function() {
+                var logElement = document.getElementById('logOutput');
+                logElement.textContent = this.logMessages.join('\n');
+                logElement.scrollTop = logElement.scrollHeight;
+                this.showElement('logOutput');
+            },
+
+            showElement: function(id) {
+                document.getElementById(id).classList.remove('hidden');
+            },
+
+            hideElement: function(id) {
+                document.getElementById(id).classList.add('hidden');
+            },
+
+            setStatus: function(message, type) {
+                var statusElement = document.getElementById('testStatus');
+                statusElement.textContent = message;
+                statusElement.className = 'status ' + (type || 'running');
+                this.showElement('testStatus');
+            },
+
+            updateProgress: function(progress, text) {
+                var progressFill = document.getElementById('progressFill');
+                var progressText = document.getElementById('progressText');
+
+                progressFill.style.width = progress + '%';
+                progressText.textContent = text || ('진행률: ' + progress + '%');
+
+                this.showElement('progressContainer');
+            },
+
+            updateSystemMetrics: function() {
+                var workerStatus = workerManager.getStatus();
+                var memoryInfo = WorkerTestUtils.getMemoryUsage();
+
+                var metrics = [
+                    { label: 'Worker 지원', value: workerStatus.supported ? '지원' : '미지원' },
+                    { label: '총 Worker 수', value: workerStatus.totalWorkers },
+                    { label: '사용 가능한 Worker', value: workerStatus.availableWorkers },
+                    { label: '사용 중인 Worker', value: workerStatus.busyWorkers },
+                    { label: '대기열 길이', value: workerStatus.queueLength }
+                ];
+
+                if (memoryInfo) {
+                    metrics.push(
+                        { label: '사용된 메모리', value: memoryInfo.used + ' MB' },
+                        { label: '전체 메모리', value: memoryInfo.total + ' MB' }
+                    );
+                }
+
+                var metricsGrid = document.getElementById('metricsGrid');
+                metricsGrid.innerHTML = metrics.map(function(metric) {
+                    return '<div class="metric-card">' +
+                           '<div class="metric-value">' + metric.value + '</div>' +
+                           '<div class="metric-label">' + metric.label + '</div>' +
+                           '</div>';
+                }).join('');
+
+                this.showElement('metricsSection');
+            },
+
+            disableTestButtons: function() {
+                var buttons = document.querySelectorAll('.test-controls .btn');
+                buttons.forEach(function(btn) {
+                    if (btn.id !== 'clearResults') {
+                        btn.disabled = true;
+                    }
+                });
+            },
+
+            enableTestButtons: function() {
+                var buttons = document.querySelectorAll('.test-controls .btn');
+                buttons.forEach(function(btn) {
+                    btn.disabled = false;
+                });
+            },
+
+            runAllTests: function() {
+                this.setStatus('전체 테스트를 실행하고 있습니다...', 'running');
+                this.disableTestButtons();
+                this.updateProgress(0, '테스트 시작...');
+
+                WorkerPerformanceTest.runAllTests()
+                    .then(this.handleTestResults.bind(this))
+                    .catch(this.handleTestError.bind(this))
+                    .finally(this.enableTestButtons.bind(this));
+            },
+
+            runWorkerTests: function() {
+                this.setStatus('WorkerManager 기능 테스트를 실행하고 있습니다...', 'running');
+                this.disableTestButtons();
+
+                WorkerPerformanceTest.runWorkerManagerTests()
+                    .then(function(results) {
+                        this.displayWorkerManagerResults(results);
+                        this.setStatus('WorkerManager 테스트 완료', 'success');
+                    }.bind(this))
+                    .catch(this.handleTestError.bind(this))
+                    .finally(this.enableTestButtons.bind(this));
+            },
+
+            runPerformanceTests: function() {
+                this.setStatus('성능 벤치마크 테스트를 실행하고 있습니다...', 'running');
+                this.disableTestButtons();
+
+                WorkerPerformanceTest.runPerformanceTests()
+                    .then(function(results) {
+                        this.displayPerformanceResults(results);
+                        this.setStatus('성능 테스트 완료', 'success');
+                    }.bind(this))
+                    .catch(this.handleTestError.bind(this))
+                    .finally(this.enableTestButtons.bind(this));
+            },
+
+            runFallbackTests: function() {
+                this.setStatus('폴백 메커니즘 테스트를 실행하고 있습니다...', 'running');
+                this.disableTestButtons();
+
+                WorkerPerformanceTest.runFallbackTests()
+                    .then(function(results) {
+                        this.displayFallbackResults(results);
+                        this.setStatus('폴백 테스트 완료', 'success');
+                    }.bind(this))
+                    .catch(this.handleTestError.bind(this))
+                    .finally(this.enableTestButtons.bind(this));
+            },
+
+            runStabilityTests: function() {
+                this.setStatus('안정성 및 부하 테스트를 실행하고 있습니다...', 'running');
+                this.disableTestButtons();
+
+                WorkerPerformanceTest.runStabilityTests()
+                    .then(function(results) {
+                        this.displayStabilityResults(results);
+                        this.setStatus('안정성 테스트 완료', 'success');
+                    }.bind(this))
+                    .catch(this.handleTestError.bind(this))
+                    .finally(this.enableTestButtons.bind(this));
+            },
+
+            handleTestResults: function(results) {
+                this.testResults = results;
+                this.updateProgress(100, '테스트 완료');
+
+                this.displaySummary(results.summary);
+                this.displayWorkerManagerResults(results.workerManager);
+                this.displayPerformanceResults(results.performance);
+                this.displayFallbackResults(results.fallback);
+                this.displayStabilityResults(results.stability);
+
+                document.getElementById('rawResultsContent').textContent = JSON.stringify(results, null, 2);
+                this.showElement('rawResults');
+
+                this.setStatus('모든 테스트가 성공적으로 완료되었습니다.', 'success');
+                this.updateSystemMetrics();
+            },
+
+            handleTestError: function(error) {
+                this.setStatus('테스트 실행 중 오류가 발생했습니다: ' + error.message, 'error');
+                console.error('Test Error:', error);
+            },
+
+            displaySummary: function(summary) {
+                var scoreElement = document.getElementById('overallScore');
+                var summaryText = document.getElementById('summaryText');
+
+                scoreElement.textContent = summary.overallSuccess.score || 0;
+                summaryText.innerHTML =
+                    '<strong>실행 시간:</strong> ' + Math.round(summary.totalDuration / 1000) + '초<br>' +
+                    '<strong>상태:</strong> ' + (summary.overallSuccess.success ? '성공' : '실패') + '<br>' +
+                    '<strong>이슈:</strong> ' + summary.overallSuccess.issues.length + '개';
+
+                this.showElement('summarySection');
+            },
+
+            displayWorkerManagerResults: function(results) {
+                var content = document.getElementById('workerManagerContent');
+
+                var html = this.createTestResult('초기화', results.initialization.success,
+                    'Workers 생성됨: ' + results.initialization.workersCreated);
+
+                html += this.createTestResult('풀 관리', results.poolManagement.queueHandled,
+                    '완료된 작업: ' + results.poolManagement.completedTasks + '/' +
+                    (results.poolManagement.completedTasks + results.poolManagement.failedTasks));
+
+                html += this.createTestResult('오류 복구', results.errorRecovery.recovered,
+                    '복구 상태: ' + (results.errorRecovery.workersStillActive ? '정상' : '비정상'));
+
+                content.innerHTML = html;
+                this.showElement('workerManagerResults');
+            },
+
+            displayPerformanceResults: function(results) {
+                var content = document.getElementById('performanceContent');
+                var html = '';
+
+                // Excel 성능 결과
+                results.excelPerformance.forEach(function(result) {
+                    html += this.createTestResult(result.name, true,
+                        '소요 시간: ' + Math.round(result.duration) + 'ms, ' +
+                        '데이터 크기: ' + Math.round(result.result.dataSize / 1024) + 'KB');
+                }.bind(this));
+
+                // 이미지 성능 결과
+                results.imagePerformance.forEach(function(result) {
+                    html += this.createTestResult(result.name, true,
+                        '소요 시간: ' + Math.round(result.duration) + 'ms, ' +
+                        '크기: ' + result.result.processedWidth + 'x' + result.result.processedHeight);
+                }.bind(this));
+
+                // 동시 처리 결과
+                html += this.createTestResult('동시 처리',
+                    results.concurrentProcessing.concurrencyEfficiency > 0.7,
+                    '효율성: ' + Math.round(results.concurrentProcessing.concurrencyEfficiency * 100) + '%, ' +
+                    '성공률: ' + Math.round((results.concurrentProcessing.successfulTasks / results.concurrentProcessing.totalTasks) * 100) + '%');
+
+                content.innerHTML = html;
+                this.showElement('performanceResults');
+            },
+
+            displayFallbackResults: function(results) {
+                var content = document.getElementById('fallbackContent');
+
+                var html = this.createTestResult('폴백 메커니즘', results.mechanism.fallbackWorked,
+                    '폴백 작동: ' + (results.mechanism.fallbackWorked ? '성공' : '실패'));
+
+                if (results.performance) {
+                    html += this.createTestResult('폴백 성능', !results.performance.fallbackSlower || results.performance.performanceDifference < 5000,
+                        'Worker 모드: ' + Math.round(results.performance.workerDuration) + 'ms, ' +
+                        '폴백 모드: ' + Math.round(results.performance.fallbackDuration) + 'ms');
+                }
+
+                content.innerHTML = html;
+                this.showElement('fallbackResults');
+            },
+
+            displayStabilityResults: function(results) {
+                var content = document.getElementById('stabilityContent');
+                var html = '';
+
+                if (!results.memoryLeak.skipped) {
+                    html += this.createTestResult('메모리 누수', !results.memoryLeak.memoryLeakSuspected,
+                        '메모리 증가: ' + results.memoryLeak.totalMemoryIncrease + 'MB, ' +
+                        '반복 횟수: ' + results.memoryLeak.iterations);
+                }
+
+                html += this.createTestResult('장시간 안정성', results.longRunning.successRate > 0.95,
+                    '성공률: ' + Math.round(results.longRunning.successRate * 100) + '%, ' +
+                    '처리율: ' + Math.round(results.longRunning.tasksPerSecond * 100) / 100 + ' 작업/초');
+
+                html += this.createTestResult('높은 부하', results.highLoad.systemStable,
+                    '성공 작업: ' + results.highLoad.successfulTasks + '/' + results.highLoad.totalTasks + ', ' +
+                    '평균 소요시간: ' + Math.round(results.highLoad.averageDuration) + 'ms');
+
+                content.innerHTML = html;
+                this.showElement('stabilityResults');
+            },
+
+            createTestResult: function(name, success, details) {
+                var statusClass = success ? 'success' : 'error';
+                var statusText = success ? '성공' : '실패';
+
+                return '<div class="test-result ' + statusClass + '">' +
+                       '<strong>' + name + '</strong>: ' + statusText + '<br>' +
+                       '<small>' + details + '</small>' +
+                       '</div>';
+            },
+
+            clearResults: function() {
+                var resultSections = [
+                    'summarySection', 'workerManagerResults', 'performanceResults',
+                    'fallbackResults', 'stabilityResults', 'rawResults', 'logOutput'
+                ];
+
+                resultSections.forEach(function(id) {
+                    this.hideElement(id);
+                }.bind(this));
+
+                this.hideElement('testStatus');
+                this.hideElement('progressContainer');
+                this.logMessages = [];
+                this.testResults = null;
+
+                this.setStatus('결과가 지워졌습니다.', 'success');
+                setTimeout(function() {
+                    this.hideElement('testStatus');
+                }.bind(this), 2000);
+            }
+        };
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            TestUI.init();
+        });
+    </script>
+</body>
+</html>
