@@ -2342,32 +2342,117 @@ var processManager = {
 
         console.log('📊 장면 정보 - 전체:', totalScenes, '선택:', selectedCount);
 
-        contentContainer.innerHTML =
-            '<div class="process-header">' +
-                '<h3>' + currentProcess.name + ' - 장면 선택</h3>' +
-                '<p>이 공정에 포함할 장면들을 선택하세요. (' + selectedCount + '/' + totalScenes + ' 선택됨)</p>' +
-            '</div>' +
-            '<div class="scene-lists-container">' +
-                '<div class="scene-list-section">' +
-                    '<h4>선택 가능한 장면</h4>' +
-                    '<div id="available-scenes-grid" class="scene-grid"></div>' +
-                '</div>' +
-                '<div class="scene-list-section">' +
-                    '<h4>전체 이미지 목록</h4>' +
-                    '<div id="all-scenes-grid" class="scene-grid readonly"></div>' +
-                '</div>' +
+        // 공정 하위 장면탭 구조로 변경
+        var html = '<div class="process-header">' +
+                '<h3>' + currentProcess.name + '</h3>' +
+                '<p>작업할 장면을 선택하세요. (' + selectedCount + '개 장면)</p>' +
             '</div>';
 
-        console.log('✅ DOM 업데이트 완료, renderSceneSelection() 호출');
-        this.renderSceneSelection();
+        // 장면탭 추가
+        if (currentProcess.selectedScenes && currentProcess.selectedScenes.length > 0) {
+            html += '<div class="scene-tabs-container">' +
+                '<div class="scene-tabs" id="scene-tabs">';
+
+            for (var i = 0; i < currentProcess.selectedScenes.length; i++) {
+                var sceneIndex = currentProcess.selectedScenes[i];
+                var sceneData = appState.sceneImages[sceneIndex];
+
+                if (sceneData) {
+                    var isActive = (i === 0) ? ' active' : ''; // 첫 번째 장면을 기본 활성
+                    html += '<div class="scene-tab' + isActive + '" data-scene-index="' + sceneIndex + '" data-tab-index="' + i + '">';
+                    html += '<span class="scene-tab-name">' + sceneData.name + '</span>';
+                    html += '</div>';
+                }
+            }
+
+            html += '</div></div>';
+
+            // 활성 장면 내용 표시
+            html += '<div class="active-scene-content" id="active-scene-content">' +
+                '<div class="scene-info">' +
+                    '<h4>선택된 장면: <span id="active-scene-name"></span></h4>' +
+                    '<p>3단계로 이동하여 미니맵과 자재를 배치하세요.</p>' +
+                '</div>' +
+            '</div>';
+        } else {
+            html += '<div class="no-scenes-message">' +
+                '<p>이 공정에 선택된 장면이 없습니다.</p>' +
+                '<p>장면을 추가하려면 장면 관리를 이용하세요.</p>' +
+            '</div>';
+        }
+
+        contentContainer.innerHTML = html;
+
+        console.log('✅ DOM 업데이트 완료, 장면탭 이벤트 바인딩');
+        this.bindSceneTabEvents();
+        this.updateActiveSceneInfo();
         console.log('✅ renderProcessContent 완료');
     },
 
-    renderSceneSelection: function() {
-        console.log('🎭 renderSceneSelection 시작');
-        this.renderAvailableScenes();
-        this.renderAllScenes();
-        console.log('🎭 renderSceneSelection 완료');
+    // 장면탭 이벤트 바인딩
+    bindSceneTabEvents: function() {
+        var sceneTabs = document.querySelectorAll('.scene-tab');
+        for (var i = 0; i < sceneTabs.length; i++) {
+            sceneTabs[i].addEventListener('click', (function(tab) {
+                return function() {
+                    // 모든 탭에서 active 클래스 제거
+                    var allTabs = document.querySelectorAll('.scene-tab');
+                    for (var j = 0; j < allTabs.length; j++) {
+                        allTabs[j].classList.remove('active');
+                    }
+
+                    // 클릭된 탭에 active 클래스 추가
+                    tab.classList.add('active');
+
+                    // 활성 장면 정보 업데이트
+                    processManager.updateActiveSceneInfo();
+
+                    console.log('장면탭 변경:', tab.dataset.sceneIndex);
+                };
+            })(sceneTabs[i]));
+        }
+    },
+
+    // 활성 장면 정보 업데이트
+    updateActiveSceneInfo: function() {
+        var activeTab = document.querySelector('.scene-tab.active');
+        var activeSceneName = document.getElementById('active-scene-name');
+
+        if (activeTab && activeSceneName) {
+            var sceneIndex = parseInt(activeTab.dataset.sceneIndex);
+            var sceneData = appState.sceneImages[sceneIndex];
+
+            if (sceneData) {
+                activeSceneName.textContent = sceneData.name;
+
+                // 전역 상태에 현재 활성 장면 저장
+                this.setActiveScene(sceneIndex);
+            }
+        }
+    },
+
+    // 현재 활성 장면 설정
+    setActiveScene: function(sceneIndex) {
+        var currentProcess = this.getCurrentProcess();
+        if (currentProcess) {
+            currentProcess.activeScene = sceneIndex;
+            console.log('활성 장면 설정:', sceneIndex, appState.sceneImages[sceneIndex]?.name);
+        }
+    },
+
+    // 현재 활성 장면 가져오기
+    getActiveScene: function() {
+        var currentProcess = this.getCurrentProcess();
+        if (currentProcess && currentProcess.activeScene !== undefined) {
+            return currentProcess.activeScene;
+        }
+
+        // 기본값: 첫 번째 선택된 장면
+        if (currentProcess && currentProcess.selectedScenes && currentProcess.selectedScenes.length > 0) {
+            return currentProcess.selectedScenes[0];
+        }
+
+        return null;
     },
 
     renderAvailableScenes: function() {
@@ -3081,8 +3166,11 @@ var workspaceManager = {
             selectElement.value = processId;
         }
 
-        // 미니맵 작업공간 렌더링
-        this.renderMinimapWorkspace(process);
+        // 현재 활성 장면 정보 가져오기
+        var activeSceneIndex = processManager.getActiveScene();
+
+        // 미니맵 작업공간 렌더링 (활성 장면 전달)
+        this.renderMinimapWorkspace(process, activeSceneIndex);
 
         // 장면 작업공간 렌더링
         this.renderSceneWorkspace(process);
@@ -3372,42 +3460,39 @@ var workspaceManager = {
                 return;
             }
 
-            if (!process.selectedScenes || process.selectedScenes.length === 0) {
-                contentElement.innerHTML = '<p class="empty-state">선택된 장면이 없습니다.</p>';
-                console.log('선택된 장면이 없음');
+            // 현재 활성 장면만 가져오기
+            var activeSceneIndex = processManager.getActiveScene();
+            if (activeSceneIndex === null) {
+                contentElement.innerHTML = '<p class="empty-state">선택된 활성 장면이 없습니다.</p>';
+                console.log('활성 장면이 없음');
                 return;
             }
 
-            console.log('선택된 장면들:', process.selectedScenes);
-            console.log('전체 장면 이미지 수:', appState.sceneImages.length);
-
-            var html = '<div class="scene-workspace-grid">';
-
-            for (var i = 0; i < process.selectedScenes.length; i++) {
-                var sceneIndex = process.selectedScenes[i];
-                var sceneData = appState.sceneImages[sceneIndex];
-
-                console.log('장면', i, ':', { sceneIndex: sceneIndex, sceneData: sceneData });
-
-                if (sceneData) {
-                    // 실제 이미지 데이터 가져오기 (메모리 캐시 확인)
-                    var actualImageData = sceneData.data;
-                    if (sceneData.data === 'current_session_stored' && sceneData.id && sessionImageCache[sceneData.id]) {
-                        actualImageData = sessionImageCache[sceneData.id];
-                        console.log('🎯 3단계 메모리 캐시에서 이미지 복원:', sceneData.name);
-                    }
-
-                    // 장면 데이터를 workspaceManager에서 사용할 수 있도록 변환
-                    var workspaceSceneData = {
-                        id: sceneIndex,  // 인덱스를 ID로 사용
-                        name: sceneData.name,
-                        url: actualImageData  // 실제 이미지 데이터 사용
-                    };
-                    html += this.renderSceneWorkspaceItem(workspaceSceneData);
-                } else {
-                    console.warn('장면 데이터가 없음:', sceneIndex);
-                }
+            var sceneData = appState.sceneImages[activeSceneIndex];
+            if (!sceneData) {
+                contentElement.innerHTML = '<p class="empty-state">장면 데이터를 찾을 수 없습니다.</p>';
+                console.log('장면 데이터 없음:', activeSceneIndex);
+                return;
             }
+
+            console.log('활성 장면 표시:', activeSceneIndex, sceneData.name);
+
+            var html = '<div class="scene-workspace-single">';
+
+            // 실제 이미지 데이터 가져오기 (메모리 캐시 확인)
+            var actualImageData = sceneData.data;
+            if (sceneData.data === 'current_session_stored' && sceneData.id && sessionImageCache[sceneData.id]) {
+                actualImageData = sessionImageCache[sceneData.id];
+                console.log('🎯 3단계 메모리 캐시에서 이미지 복원:', sceneData.name);
+            }
+
+            // 활성 장면 데이터를 workspaceManager에서 사용할 수 있도록 변환
+            var workspaceSceneData = {
+                id: activeSceneIndex,
+                name: sceneData.name,
+                url: actualImageData
+            };
+            html += this.renderSceneWorkspaceItem(workspaceSceneData);
 
             html += '</div>';
             contentElement.innerHTML = html;

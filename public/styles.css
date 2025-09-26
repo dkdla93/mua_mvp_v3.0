@@ -896,6 +896,90 @@ body {
     border: 2px dashed #dee2e6;
 }
 
+/* 장면탭 스타일 */
+.scene-tabs-container {
+    margin: 20px 0;
+}
+
+.scene-tabs {
+    display: flex;
+    gap: 5px;
+    border-bottom: 2px solid #e9ecef;
+    margin-bottom: 20px;
+}
+
+.scene-tab {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.scene-tab:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.scene-tab.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.scene-tab-name {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+.active-scene-content {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.scene-info h4 {
+    color: #333;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.scene-info p {
+    color: #6c757d;
+    margin: 0;
+    font-size: 14px;
+}
+
+.no-scenes-message {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+}
+
+.no-scenes-message p {
+    color: #856404;
+    margin: 0 0 10px 0;
+}
+
+.no-scenes-message p:last-child {
+    margin: 0;
+}
+
 .empty-state p {
     margin: 5px 0;
 }
