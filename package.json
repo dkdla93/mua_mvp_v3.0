@@ -1,0 +1,39 @@
+{
+  "name": "construction-docs-generator",
+  "version": "2.0.0",
+  "description": "인테리어 착공도서 자동생성 시스템 - Interior Construction Document Auto Generator",
+  "main": "public/index.html",
+  "scripts": {
+    "start": "npx http-server public -p 3000 -c-1",
+    "build": "echo 'Static files ready for deployment'",
+    "test": "echo 'No tests specified yet'",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "interior-design",
+    "construction-documents",
+    "powerpoint-generation",
+    "excel-parsing",
+    "korean"
+  ],
+  "author": "Construction Document Generator Team",
+  "license": "MIT",
+  "dependencies": {
+    "xlsx": "^0.18.5",
+    "pptxgenjs": "^3.12.0"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/construction-docs/generator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/construction-docs/generator/issues"
+  },
+  "homepage": "https://construction-docs-generator.vercel.app"
+}

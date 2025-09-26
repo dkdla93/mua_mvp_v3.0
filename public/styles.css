@@ -1,0 +1,1008 @@
+/* 착공도서 자동생성 시스템 - 스타일시트 */
+
+/* 기본 설정 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Malgun Gothic', '맑은 고딕', Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f5f7fa;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* 헤더 */
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding: 20px 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+}
+
+.header h1 {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    font-size: 16px;
+    opacity: 0.9;
+}
+
+/* 진행 단계 표시 */
+.progress-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    padding: 0 20px;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+}
+
+.step::after {
+    content: '';
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    width: calc(100% - 30px);
+    height: 2px;
+    background-color: #e0e6ed;
+    z-index: -1;
+}
+
+.step:last-child::after {
+    display: none;
+}
+
+.step.active::after {
+    background-color: #667eea;
+}
+
+.step-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #e0e6ed;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.step.active .step-number {
+    background-color: #667eea;
+    color: white;
+}
+
+.step.completed .step-number {
+    background-color: #28a745;
+    color: white;
+}
+
+.step-title {
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+}
+
+.step.active .step-title {
+    color: #667eea;
+    font-weight: bold;
+}
+
+/* 메인 컨텐츠 */
+.main-content {
+    background: white;
+    border-radius: 8px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.step-content {
+    display: none;
+}
+
+.step-content.active {
+    display: block;
+}
+
+.step-content h2 {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #667eea;
+}
+
+/* 파일 업로드 영역 */
+.upload-section {
+    margin-bottom: 30px;
+}
+
+.upload-section h3 {
+    font-size: 18px;
+    color: #444;
+    margin-bottom: 15px;
+}
+
+.file-upload-area {
+    border: 2px dashed #d1d9e6;
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.file-upload-area:hover {
+    border-color: #667eea;
+    background-color: #f8f9ff;
+}
+
+.file-upload-area.dragover {
+    border-color: #667eea;
+    background-color: #f0f4ff;
+}
+
+.upload-placeholder {
+    display: block;
+}
+
+.upload-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.file-upload-area p {
+    margin: 8px 0;
+    color: #666;
+}
+
+.file-info {
+    font-size: 12px;
+    color: #999 !important;
+}
+
+.file-status {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+    text-align: left;
+}
+
+.file-status.success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.file-status.error {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.file-status.progress {
+    background-color: #e8f4fd;
+    border-color: #bee5eb;
+    color: #0c5460;
+    padding: 20px 15px;
+}
+
+.progress-info {
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.progress-bar-container {
+    width: 100%;
+    height: 20px;
+    background-color: #dee2e6;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+    min-width: 2px;
+}
+
+.progress-percentage {
+    text-align: center;
+    font-weight: bold;
+    font-size: 16px;
+    color: #667eea;
+}
+
+/* 파일 상태 액션 버튼 */
+.file-status-actions {
+    margin-top: 10px;
+    text-align: right;
+}
+
+.btn-reset {
+    background-color: #6c757d;
+    color: white;
+    padding: 5px 12px;
+    font-size: 12px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.btn-reset:hover {
+    background-color: #545b62;
+}
+
+/* 버튼 스타일 */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-block;
+    text-decoration: none;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background-color: #667eea;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #5a6fd8;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: #545b62;
+}
+
+.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background-color: #218838;
+}
+
+/* 단계 네비게이션 */
+.step-navigation {
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e6ed;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* 로딩 오버레이 */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-content {
+    background: white;
+    border-radius: 8px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 모달 */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    padding: 20px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+}
+
+.modal-close:hover {
+    color: #666;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    padding: 0 20px 20px;
+    text-align: right;
+}
+
+/* 공정 관리 영역 (2단계) */
+.process-tabs {
+    display: flex;
+    align-items: center;
+    border-bottom: 2px solid #e0e6ed;
+    margin-bottom: 20px;
+    padding-bottom: 0;
+    overflow-x: auto;
+    gap: 5px;
+}
+
+.process-tab-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.process-tab {
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 80px;
+    border-radius: 4px 4px 0 0;
+}
+
+.process-tab.active {
+    border-bottom-color: #667eea;
+    color: #667eea;
+    font-weight: bold;
+    background-color: #f8f9ff;
+}
+
+.process-tab:hover:not(.active) {
+    background-color: #f0f4ff;
+}
+
+.process-name {
+    font-weight: inherit;
+}
+
+.scene-count {
+    background-color: #667eea;
+    color: white;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 16px;
+    text-align: center;
+    line-height: 1;
+}
+
+.process-tab.active .scene-count {
+    background-color: #5a6fd8;
+}
+
+.process-delete-btn {
+    background: none;
+    border: none;
+    color: #dc3545;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 2px;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.process-delete-btn:hover {
+    background-color: #dc3545;
+    color: white;
+}
+
+.add-process-btn {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 10px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.add-process-btn:hover {
+    background-color: #218838;
+}
+
+.add-process-btn:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+}
+
+.add-icon {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* 공정 컨텐츠 영역 */
+.process-header {
+    margin-bottom: 20px;
+}
+
+.process-header h3 {
+    color: #333;
+    margin-bottom: 10px;
+}
+
+.process-summary {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 4px solid #667eea;
+}
+
+.process-summary p {
+    margin: 0 0 10px 0;
+    color: #495057;
+}
+
+.process-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 2px dashed #dee2e6;
+}
+
+.empty-state p {
+    margin: 5px 0;
+}
+
+/* 향상된 장면 선택 UI */
+.scene-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.scene-item {
+    border: 2px solid #e0e6ed;
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+    position: relative;
+}
+
+.scene-item:hover {
+    border-color: #667eea;
+    background-color: #f8f9ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.scene-item.selected {
+    border-color: #667eea;
+    background-color: #f0f4ff;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+}
+
+.scene-checkbox-wrapper {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+}
+
+.scene-checkbox-wrapper input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.scene-checkbox-label {
+    cursor: pointer;
+}
+
+.scene-thumbnail {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    transition: opacity 0.2s ease;
+}
+
+.scene-item:hover .scene-thumbnail {
+    opacity: 0.9;
+}
+
+.scene-info {
+    text-align: left;
+}
+
+.scene-name {
+    font-size: 13px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 4px;
+    word-break: break-word;
+    line-height: 1.2;
+}
+
+.scene-details {
+    font-size: 11px;
+    color: #666;
+    line-height: 1.3;
+}
+
+.scene-details small {
+    font-size: 10px;
+    color: #999;
+}
+
+/* 장면 선택 그리드 */
+.scene-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.scene-item {
+    border: 2px solid #e0e6ed;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.scene-item:hover {
+    border-color: #667eea;
+    background-color: #f8f9ff;
+}
+
+.scene-item.selected {
+    border-color: #667eea;
+    background-color: #f0f4ff;
+}
+
+.scene-thumbnail {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.scene-name {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+/* 드래그 앤 드롭 및 자재 배치 스타일 */
+.scene-workspace-item {
+    position: relative;
+    border: 2px solid #e0e6ed;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 20px;
+    background: white;
+    transition: all 0.3s ease;
+}
+
+.scene-workspace-item.drag-over {
+    border-color: #667eea;
+    background-color: #f0f4ff;
+    transform: scale(1.02);
+}
+
+.scene-workspace-image {
+    width: 100%;
+    max-width: 400px;
+    height: auto;
+    border-radius: 4px;
+    display: block;
+    margin: 0 auto;
+}
+
+.material-badges {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    pointer-events: none;
+}
+
+.material-badge {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background-color: #667eea;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    border: 2px solid white;
+    z-index: 10;
+    transition: all 0.2s ease;
+}
+
+.material-badge:hover {
+    transform: translate(-50%, -50%) scale(1.1);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+}
+
+.material-badge.moving {
+    animation: pulse 1s infinite;
+    box-shadow: 0 0 10px #667eea;
+}
+
+@keyframes pulse {
+    0% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.1); }
+    100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+/* 자재 테이블 드래그 스타일 */
+.material-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    background: white;
+}
+
+.material-table th,
+.material-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #e0e6ed;
+}
+
+.material-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #333;
+}
+
+.material-table tbody tr {
+    cursor: grab;
+    transition: all 0.2s ease;
+}
+
+.material-table tbody tr:hover {
+    background-color: #f8f9ff;
+}
+
+.material-table tbody tr[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.material-table tbody tr.dragging {
+    opacity: 0.7;
+    background-color: #f0f4ff;
+    border: 2px solid #667eea;
+}
+
+/* 자재 목록 스타일 */
+.material-list {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.material-list h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 14px;
+}
+
+.material-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.material-list li {
+    display: flex;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid #e0e6ed;
+}
+
+.material-list li:last-child {
+    border-bottom: none;
+}
+
+.material-number {
+    width: 24px;
+    height: 24px;
+    background-color: #667eea;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.material-name {
+    font-weight: bold;
+    color: #333;
+    margin-right: 10px;
+}
+
+.material-category {
+    color: #666;
+    font-size: 12px;
+}
+
+/* 공정 선택 드롭다운 */
+.process-selector {
+    margin-bottom: 30px;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #667eea;
+}
+
+.process-selector label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #333;
+}
+
+.form-select {
+    width: 100%;
+    max-width: 300px;
+    padding: 8px 12px;
+    border: 1px solid #d1d9e6;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: white;
+}
+
+.drag-instruction {
+    background-color: #e8f4fd;
+    border: 1px solid #bee5eb;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 15px;
+    color: #0c5460;
+    font-size: 13px;
+    text-align: center;
+}
+
+.scene-workspace-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.scene-material-list {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e0e6ed;
+}
+
+/* 작업공간 레이아웃 */
+.workspace-container {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.scene-workspace {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.material-workspace {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+/* 드래그 가이드 */
+.drag-guide {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(102, 126, 234, 0.9);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.drag-guide.visible {
+    opacity: 1;
+}
+
+/* 정보 모달 커스텀 스타일 */
+.modal.info-modal .modal-content {
+    max-width: 600px;
+}
+
+.modal.info-modal .modal-body h4 {
+    color: #667eea;
+    margin-bottom: 15px;
+}
+
+.modal.info-modal .modal-body hr {
+    border: none;
+    border-top: 1px solid #e0e6ed;
+    margin: 15px 0;
+}
+
+.modal.info-modal .btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.modal.info-modal .btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+
+    .header h1 {
+        font-size: 24px;
+    }
+
+    .progress-steps {
+        padding: 0 10px;
+    }
+
+    .step-title {
+        font-size: 10px;
+    }
+
+    .main-content {
+        padding: 20px;
+    }
+
+    .file-upload-area {
+        padding: 20px;
+    }
+
+    .upload-icon {
+        font-size: 36px;
+    }
+}

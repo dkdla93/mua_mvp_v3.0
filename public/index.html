@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>착공도서 자동생성 시스템</title>
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>착공도서 자동생성 시스템</h1>
+            <p class="subtitle">인테리어 공사 착공도서를 자동으로 생성해보세요</p>
+        </header>
+
+        <!-- Progress Steps -->
+        <div class="progress-steps">
+            <div class="step active" data-step="1">
+                <span class="step-number">1</span>
+                <span class="step-title">파일 업로드</span>
+            </div>
+            <div class="step" data-step="2">
+                <span class="step-number">2</span>
+                <span class="step-title">공정 관리</span>
+            </div>
+            <div class="step" data-step="3">
+                <span class="step-number">3</span>
+                <span class="step-title">매칭 & 배치</span>
+            </div>
+            <div class="step" data-step="4">
+                <span class="step-number">4</span>
+                <span class="step-title">생성 & 다운로드</span>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Step 1: File Upload -->
+            <section id="step-1" class="step-content active">
+                <h2>1단계: 파일 업로드</h2>
+
+                <!-- Excel Upload -->
+                <div class="upload-section">
+                    <h3>엑셀 자재표</h3>
+                    <div class="file-upload-area" id="excel-upload">
+                        <input type="file" id="excel-file" accept=".xlsx,.xls" style="display: none;">
+                        <div class="upload-placeholder">
+                            <div class="upload-icon">📊</div>
+                            <p>엑셀 파일을 선택하거나 드래그하세요</p>
+                            <p class="file-info">.xlsx, .xls 형식 (최대 10MB)</p>
+                            <button type="button" class="btn btn-primary" onclick="document.getElementById('excel-file').click()">
+                                파일 선택
+                            </button>
+                        </div>
+                        <div class="file-status" id="excel-status" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Minimap Upload -->
+                <div class="upload-section">
+                    <h3>미니맵 이미지</h3>
+                    <div class="file-upload-area" id="minimap-upload">
+                        <input type="file" id="minimap-file" accept="image/*" style="display: none;">
+                        <div class="upload-placeholder">
+                            <div class="upload-icon">🗺️</div>
+                            <p>미니맵 이미지를 선택하거나 드래그하세요</p>
+                            <p class="file-info">.jpg, .png, .gif 형식 (최대 50MB)</p>
+                            <button type="button" class="btn btn-primary" onclick="document.getElementById('minimap-file').click()">
+                                파일 선택
+                            </button>
+                        </div>
+                        <div class="file-status" id="minimap-status" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Scene Images Upload -->
+                <div class="upload-section">
+                    <h3>장면 이미지들</h3>
+                    <div class="file-upload-area" id="scenes-upload">
+                        <input type="file" id="scenes-files" accept="image/*" multiple style="display: none;">
+                        <div class="upload-placeholder">
+                            <div class="upload-icon">🏠</div>
+                            <p>장면 이미지들을 선택하거나 드래그하세요</p>
+                            <p class="file-info">.jpg, .png, .gif 형식 (다중 선택 가능, 최대 50MB)</p>
+                            <button type="button" class="btn btn-primary" onclick="document.getElementById('scenes-files').click()">
+                                파일 선택
+                            </button>
+                        </div>
+                        <div class="file-status" id="scenes-status" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="step-navigation">
+                    <button type="button" class="btn btn-secondary" disabled>이전</button>
+                    <button type="button" class="btn btn-primary" id="next-step-1" disabled>다음</button>
+                </div>
+            </section>
+
+            <!-- Step 2: Process Management (공정 관리) -->
+            <section id="step-2" class="step-content">
+                <h2>2단계: 공정 관리</h2>
+                <div class="process-tabs" id="process-tabs">
+                    <!-- 공정 탭들이 여기 동적으로 생성됩니다 -->
+                </div>
+                <div class="process-content" id="process-content">
+                    <!-- 공정별 장면 선택 내용이 여기 표시됩니다 -->
+                </div>
+
+                <div class="step-navigation">
+                    <button type="button" class="btn btn-secondary" id="prev-step-2">이전</button>
+                    <button type="button" class="btn btn-primary" id="next-step-2" disabled>다음</button>
+                </div>
+            </section>
+
+            <!-- Step 3: Material Mapping & Placement -->
+            <section id="step-3" class="step-content">
+                <h2>3단계: 매칭 & 자재 배치</h2>
+                <div class="workspace" id="workspace">
+                    <!-- 작업 공간이 여기 구성됩니다 -->
+                </div>
+
+                <div class="step-navigation">
+                    <button type="button" class="btn btn-secondary" id="prev-step-3">이전</button>
+                    <button type="button" class="btn btn-primary" id="next-step-3" disabled>다음</button>
+                </div>
+            </section>
+
+            <!-- Step 4: Generate & Download -->
+            <section id="step-4" class="step-content">
+                <h2>4단계: 생성 & 다운로드</h2>
+                <div class="preview-area" id="preview-area">
+                    <!-- PPT 미리보기가 여기 표시됩니다 -->
+                </div>
+
+                <div class="step-navigation">
+                    <button type="button" class="btn btn-secondary" id="prev-step-4">이전</button>
+                    <button type="button" class="btn btn-success" id="generate-ppt" disabled>PPT 생성</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loading-overlay" style="display: none;">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p id="loading-message">처리 중입니다...</p>
+            </div>
+        </div>
+
+        <!-- Error Modal -->
+        <div class="modal" id="error-modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>오류 발생</h3>
+                    <button type="button" class="modal-close" onclick="closeModal('error-modal')">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="error-message"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="closeModal('error-modal')">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
