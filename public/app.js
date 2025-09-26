@@ -2159,11 +2159,30 @@ var processManager = {
     maxProcesses: 10, // 최대 공정 개수
 
     init: function() {
-        console.log('공정 관리자 초기화');
-        this.validateProcessData();
-        this.renderProcessTabs();
-        this.renderProcessContent();
-        this.updateNavigationState();
+        console.log('🚀 공정 관리자 초기화 시작');
+
+        try {
+            console.log('1️⃣ validateProcessData() 호출');
+            this.validateProcessData();
+            console.log('✅ validateProcessData() 완료');
+
+            console.log('2️⃣ renderProcessTabs() 호출');
+            this.renderProcessTabs();
+            console.log('✅ renderProcessTabs() 완료');
+
+            console.log('3️⃣ renderProcessContent() 호출 시작');
+            this.renderProcessContent();
+            console.log('✅ renderProcessContent() 완료');
+
+            console.log('4️⃣ updateNavigationState() 호출');
+            this.updateNavigationState();
+            console.log('✅ updateNavigationState() 완료');
+
+            console.log('🎉 공정 관리자 초기화 완료');
+        } catch (error) {
+            console.error('💥 공정 관리자 초기화 중 오류:', error);
+            console.error('💥 오류 스택:', error.stack);
+        }
     },
 
     validateProcessData: function() {
