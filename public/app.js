@@ -2807,6 +2807,41 @@ var processManager = {
         return null;
     },
 
+    // 장면 선택/해제 토글
+    toggleSceneSelection: function(sceneIndex, isSelected) {
+        var currentProcess = this.getCurrentProcess();
+        if (!currentProcess) return;
+
+        var selectedScenes = currentProcess.selectedScenes;
+        var currentIndex = selectedScenes.indexOf(sceneIndex);
+
+        if (isSelected && currentIndex === -1) {
+            selectedScenes.push(sceneIndex);
+            console.log('장면 추가됨:', sceneIndex, '공정:', currentProcess.name);
+        } else if (!isSelected && currentIndex !== -1) {
+            selectedScenes.splice(currentIndex, 1);
+            console.log('장면 제거됨:', sceneIndex, '공정:', currentProcess.name);
+        }
+
+        // UI 업데이트
+        this.updateProcessTabs();
+        this.checkStep2Completion();
+    },
+
+    // 프로세스 탭 업데이트 (장면 개수 표시)
+    updateProcessTabs: function() {
+        for (var i = 0; i < appState.processes.length; i++) {
+            var process = appState.processes[i];
+            var sceneCountElement = document.querySelector(
+                '.process-tab[data-process-id="' + process.id + '"] .scene-count'
+            );
+
+            if (sceneCountElement) {
+                sceneCountElement.textContent = process.selectedScenes.length;
+            }
+        }
+    },
+
     checkStep2Completion: function() {
         var hasSelectedScenes = false;
 
