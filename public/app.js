@@ -1462,41 +1462,76 @@ var stepController = {
 
     // PPT 생성
     generatePPT: function() {
+        var self = this;
         utils.showLoading('PPT를 생성하고 있습니다...');
 
-        try {
-            // PptxGenJS 라이브러리 확인
-            if (typeof PptxGenJS === 'undefined') {
-                throw new Error('PPT 생성 라이브러리를 찾을 수 없습니다.');
-            }
+        // 비동기 처리를 위해 setTimeout 사용
+        setTimeout(function() {
+            try {
+                console.log('PPT 생성 시작 - PptxGenJS 확인 중...');
 
-            var pptx = new PptxGenJS();
-
-            // 표지 슬라이드 생성
-            this.createCoverSlide(pptx);
-
-            // 각 공정별 슬라이드 생성
-            for (var i = 0; i < appState.processes.length; i++) {
-                var process = appState.processes[i];
-                if (process.selectedScenes && process.selectedScenes.length > 0) {
-                    this.createProcessSlide(pptx, process);
+                // PptxGenJS 라이브러리 확인
+                if (typeof PptxGenJS === 'undefined') {
+                    throw new Error('PPT 생성 라이브러리를 찾을 수 없습니다. PptxGenJS가 로드되지 않았습니다.');
                 }
+
+                console.log('PptxGenJS 확인 완료, PPT 인스턴스 생성 중...');
+                var pptx = new PptxGenJS();
+
+                // 표지 슬라이드 생성
+                console.log('표지 슬라이드 생성 중...');
+                self.createCoverSlide(pptx);
+
+                // 각 공정별 슬라이드 생성
+                console.log('공정별 슬라이드 생성 중...', appState.processes.length + '개 공정');
+                for (var i = 0; i < appState.processes.length; i++) {
+                    var process = appState.processes[i];
+                    if (process.selectedScenes && process.selectedScenes.length > 0) {
+                        console.log('공정 슬라이드 생성:', process.name);
+                        self.createProcessSlide(pptx, process);
+                    }
+                }
+
+                // 자재표 요약 슬라이드 생성
+                console.log('자재표 요약 슬라이드 생성 중...');
+                self.createMaterialSummarySlide(pptx);
+
+                // 파일명 생성 (한글 파일명 지원)
+                var fileName = '착공도서_' + new Date().toLocaleDateString('ko-KR').replace(/\./g, '-');
+                console.log('PPT 다운로드 시도, 파일명:', fileName);
+
+                // PPT 파일 다운로드 - Promise 기반 처리
+                try {
+                    pptx.save(fileName).then(function() {
+                        console.log('PPT 다운로드 성공!');
+                        utils.hideLoading();
+                        utils.showSuccess('PPT가 성공적으로 생성되고 다운로드되었습니다!');
+                    }).catch(function(saveError) {
+                        console.error('PPT 저장 오류:', saveError);
+                        utils.hideLoading();
+                        utils.showError('PPT 저장 중 오류가 발생했습니다. 브라우저에서 다운로드를 허용해주세요.');
+                    });
+                } catch (saveError) {
+                    // save()가 Promise를 반환하지 않는 경우를 위한 fallback
+                    console.log('동기식 저장 시도...');
+                    pptx.save(fileName);
+
+                    utils.hideLoading();
+                    utils.showSuccess('PPT가 성공적으로 생성되었습니다! 다운로드를 확인해주세요.');
+                }
+
+            } catch (error) {
+                console.error('PPT 생성 오류:', error);
+                console.error('Error stack:', error.stack);
+                utils.hideLoading();
+
+                var errorMessage = 'PPT 생성 중 오류가 발생했습니다: ' + error.message;
+                if (error.message.includes('PptxGenJS')) {
+                    errorMessage += '\n\n페이지를 새로고침 후 다시 시도해주세요.';
+                }
+                utils.showError(errorMessage);
             }
-
-            // 자재표 요약 슬라이드 생성
-            this.createMaterialSummarySlide(pptx);
-
-            // PPT 파일 다운로드
-            pptx.save('착공도서_' + new Date().toISOString().substr(0, 10));
-
-            utils.hideLoading();
-            utils.showSuccess('PPT가 성공적으로 생성되었습니다!');
-
-        } catch (error) {
-            console.error('PPT 생성 오류:', error);
-            utils.hideLoading();
-            utils.showError('PPT 생성 중 오류가 발생했습니다: ' + error.message);
-        }
+        }, 100); // 100ms 지연으로 UI 업데이트 보장
     },
 
     // 표지 슬라이드 생성
