@@ -2029,7 +2029,7 @@ var workspaceManager = {
             console.log('데이터 상태:', {
                 processes: appState.processes.length,
                 sceneImages: appState.sceneImages.length,
-                materialData: appState.materialData ? appState.materialData.length : 0
+                materials: appState.materials ? appState.materials.length : 0
             });
 
             // 기존 내용 제거
@@ -2038,10 +2038,14 @@ var workspaceManager = {
             // 공정 선택 드롭다운 생성
             this.renderProcessSelector(workspaceElement);
 
-            // 작업공간 컨테이너 생성
+            // 작업공간 컨테이너 생성 (3열 레이아웃: 미니맵 | 장면 이미지 | 자재표)
             var container = document.createElement('div');
             container.className = 'workspace-container';
             container.innerHTML =
+                '<div class="minimap-workspace" id="minimap-workspace">' +
+                    '<h3>미니맵</h3>' +
+                    '<div id="minimap-workspace-content"></div>' +
+                '</div>' +
                 '<div class="scene-workspace" id="scene-workspace">' +
                     '<h3>장면 이미지</h3>' +
                     '<div id="scene-workspace-content"></div>' +
@@ -2113,6 +2117,9 @@ var workspaceManager = {
             selectElement.value = processId;
         }
 
+        // 미니맵 작업공간 렌더링
+        this.renderMinimapWorkspace(process);
+
         // 장면 작업공간 렌더링
         this.renderSceneWorkspace(process);
 
@@ -2120,6 +2127,142 @@ var workspaceManager = {
         this.renderMaterialWorkspace();
 
         console.log('공정 선택됨:', process.name, '(' + process.selectedScenes.length + '개 장면)');
+    },
+
+    // 미니맵 작업공간 렌더링 (선택된 장면을 빨간 박스로 표시)
+    renderMinimapWorkspace: function(process) {
+        console.log('renderMinimapWorkspace 시작');
+
+        try {
+            var contentElement = document.getElementById('minimap-workspace-content');
+            if (!contentElement) {
+                console.error('minimap-workspace-content 요소를 찾을 수 없습니다.');
+                return;
+            }
+
+            if (!appState.minimapImage) {
+                contentElement.innerHTML = '<p class="empty-state">미니맵 이미지가 업로드되지 않았습니다.</p>';
+                return;
+            }
+
+            // 미니맵 컨테이너 생성
+            var html = '<div class="minimap-container" style="position: relative; display: inline-block;">';
+            html += '<img src="' + appState.minimapImage + '" alt="미니맵" class="minimap-image" style="max-width: 100%; height: auto;">';
+
+            // 선택된 장면들에 대해 빨간 박스 표시
+            if (process.selectedScenes && process.selectedScenes.length > 0) {
+                html += '<div class="minimap-overlays" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">';
+
+                for (var i = 0; i < process.selectedScenes.length; i++) {
+                    var sceneIndex = process.selectedScenes[i];
+                    var sceneData = appState.sceneImages[sceneIndex];
+
+                    if (sceneData) {
+                        // 각 장면에 대해 빨간 박스 생성 (임시로 랜덤 위치)
+                        // 실제로는 장면과 미니맵의 매핑 정보가 필요
+                        var boxStyle = this.generateSceneBox(i, process.selectedScenes.length);
+                        html += '<div class="scene-box" data-scene-index="' + sceneIndex + '" ';
+                        html += 'style="position: absolute; border: 2px solid #ff4444; background: rgba(255, 68, 68, 0.2); ';
+                        html += boxStyle + 'cursor: pointer;" ';
+                        html += 'title="' + sceneData.name + '">';
+                        html += '<span style="position: absolute; top: -20px; left: 2px; background: #ff4444; color: white; padding: 2px 6px; font-size: 12px; border-radius: 3px;">';
+                        html += (i + 1);
+                        html += '</span>';
+                        html += '</div>';
+                    }
+                }
+
+                html += '</div>';
+            }
+
+            html += '</div>';
+
+            // 범례 추가
+            html += '<div class="minimap-legend" style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-radius: 4px;">';
+            html += '<h4 style="margin: 0 0 8px 0; font-size: 14px;">선택된 장면</h4>';
+
+            if (process.selectedScenes && process.selectedScenes.length > 0) {
+                for (var i = 0; i < process.selectedScenes.length; i++) {
+                    var sceneIndex = process.selectedScenes[i];
+                    var sceneData = appState.sceneImages[sceneIndex];
+
+                    if (sceneData) {
+                        html += '<div style="display: flex; align-items: center; margin-bottom: 4px;">';
+                        html += '<span style="display: inline-block; width: 20px; height: 20px; background: #ff4444; margin-right: 8px; text-align: center; color: white; font-size: 12px; line-height: 20px; border-radius: 2px;">';
+                        html += (i + 1);
+                        html += '</span>';
+                        html += '<span style="font-size: 13px;">' + sceneData.name + '</span>';
+                        html += '</div>';
+                    }
+                }
+            } else {
+                html += '<p style="margin: 0; color: #666; font-size: 13px;">선택된 장면이 없습니다.</p>';
+            }
+
+            html += '</div>';
+
+            contentElement.innerHTML = html;
+
+            // 클릭 이벤트 추가
+            this.bindMinimapEvents();
+
+            console.log('미니맵 렌더링 완료');
+
+        } catch (error) {
+            console.error('renderMinimapWorkspace 오류:', error);
+            var contentElement = document.getElementById('minimap-workspace-content');
+            if (contentElement) {
+                contentElement.innerHTML = '<p class="empty-state">미니맵 표시 중 오류가 발생했습니다.</p>';
+            }
+        }
+    },
+
+    // 장면 박스 위치 생성 (임시 구현 - 실제로는 매핑 데이터 필요)
+    generateSceneBox: function(index, total) {
+        // 임시로 미니맵을 격자로 나누어 배치
+        var rows = Math.ceil(Math.sqrt(total));
+        var cols = Math.ceil(total / rows);
+
+        var row = Math.floor(index / cols);
+        var col = index % cols;
+
+        var boxWidth = 80 / cols;  // 미니맵의 80% 영역을 사용
+        var boxHeight = 60 / rows; // 미니맵의 60% 영역을 사용
+
+        var left = 10 + (col * boxWidth);  // 10%부터 시작
+        var top = 20 + (row * boxHeight);  // 20%부터 시작
+
+        return 'left: ' + left + '%; top: ' + top + '%; width: ' + (boxWidth - 2) + '%; height: ' + (boxHeight - 2) + '%;';
+    },
+
+    // 미니맵 이벤트 바인딩
+    bindMinimapEvents: function() {
+        var self = this;
+        var sceneBoxes = document.querySelectorAll('.scene-box');
+
+        for (var i = 0; i < sceneBoxes.length; i++) {
+            sceneBoxes[i].addEventListener('click', function() {
+                var sceneIndex = this.getAttribute('data-scene-index');
+                console.log('미니맵에서 장면 클릭:', sceneIndex);
+
+                // 해당 장면으로 스크롤 이동
+                self.scrollToScene(sceneIndex);
+            });
+        }
+    },
+
+    // 장면으로 스크롤 이동
+    scrollToScene: function(sceneIndex) {
+        var sceneElement = document.querySelector('[data-scene-id="' + sceneIndex + '"]');
+        if (sceneElement) {
+            sceneElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // 잠깐 하이라이트 효과
+            sceneElement.style.boxShadow = '0 0 20px rgba(102, 126, 234, 0.5)';
+            setTimeout(function() {
+                sceneElement.style.boxShadow = '';
+            }, 2000);
+        }
     },
 
     // 장면 작업공간 렌더링
@@ -2198,53 +2341,65 @@ var workspaceManager = {
 
     // 자재표 작업공간 렌더링
     renderMaterialWorkspace: function() {
-        var contentElement = document.getElementById('material-workspace-content');
-        if (!contentElement) return;
+        console.log('renderMaterialWorkspace 시작');
 
-        if (!appState.materialData || appState.materialData.length === 0) {
-            contentElement.innerHTML = '<p class="empty-state">자재표를 먼저 업로드해주세요.</p>';
-            return;
-        }
+        try {
+            var contentElement = document.getElementById('material-workspace-content');
+            if (!contentElement) {
+                console.error('material-workspace-content 요소를 찾을 수 없습니다.');
+                return;
+            }
 
-        var html = '<div class="material-table-container">';
-        html += '<p class="drag-instruction">자재를 클릭하고 드래그하여 장면 이미지에 배치하세요.</p>';
-        html += '<table class="material-table" id="material-table">';
-        html += '<thead><tr>';
+            // 자재 데이터 확인 (materials 배열 사용)
+            if (!appState.materials || appState.materials.length === 0) {
+                console.log('자재 데이터 없음:', appState.materials);
+                contentElement.innerHTML = '<p class="empty-state">자재표를 먼저 업로드해주세요.</p>';
+                return;
+            }
 
-        // 헤더 생성
-        var sampleData = appState.materialData[0];
-        for (var key in sampleData) {
-            if (sampleData.hasOwnProperty(key)) {
-                html += '<th>' + key + '</th>';
+            console.log('자재 데이터 확인:', appState.materials.length, '개 자재');
+
+            var html = '<div class="material-table-container">';
+            html += '<p class="drag-instruction">자재를 클릭하고 드래그하여 장면 이미지에 배치하세요.</p>';
+            html += '<table class="material-table" id="material-table">';
+            html += '<thead><tr>';
+            html += '<th>번호</th><th>분류</th><th>자재명</th><th>시트</th>';
+            html += '</tr></thead><tbody>';
+
+            // appState.materials 배열을 사용하여 테이블 생성
+            for (var i = 0; i < appState.materials.length; i++) {
+                var material = appState.materials[i];
+                html += '<tr data-material-index="' + i + '">';
+                html += '<td>' + (material.id || i + 1) + '</td>';
+                html += '<td>' + (material.category || '일반') + '</td>';
+                html += '<td>' + (material.material || material.displayId || '자재 ' + (i + 1)) + '</td>';
+                html += '<td>' + (material.tabName || '') + '</td>';
+                html += '</tr>';
+            }
+
+            html += '</tbody></table></div>';
+            contentElement.innerHTML = html;
+
+            this.materialTableRendered = true;
+
+            console.log('자재표 렌더링 완료:', appState.materials.length, '개 행');
+
+            // 드래그 소스 설정
+            setTimeout(function() {
+                dragDropManager.setupMaterialDragSources();
+                console.log('드래그 소스 설정 완료');
+
+                // 커스텀 이벤트 발생
+                document.dispatchEvent(new Event('materialTableUpdated'));
+            }, 100);
+
+        } catch (error) {
+            console.error('renderMaterialWorkspace 오류:', error);
+            var contentElement = document.getElementById('material-workspace-content');
+            if (contentElement) {
+                contentElement.innerHTML = '<p class="empty-state">자재표 표시 중 오류가 발생했습니다.</p>';
             }
         }
-        html += '</tr></thead><tbody>';
-
-        // 데이터 행 생성
-        for (var i = 0; i < appState.materialData.length; i++) {
-            var item = appState.materialData[i];
-            html += '<tr data-material-index="' + i + '">';
-
-            for (var key in sampleData) {
-                if (sampleData.hasOwnProperty(key)) {
-                    html += '<td>' + (item[key] || '') + '</td>';
-                }
-            }
-            html += '</tr>';
-        }
-
-        html += '</tbody></table></div>';
-        contentElement.innerHTML = html;
-
-        this.materialTableRendered = true;
-
-        // 드래그 소스 설정
-        setTimeout(function() {
-            dragDropManager.setupMaterialDragSources();
-
-            // 커스텀 이벤트 발생
-            document.dispatchEvent(new Event('materialTableUpdated'));
-        }, 100);
     },
 
     // 작업공간 초기화
@@ -2359,7 +2514,7 @@ var dragDropManager = {
                 index: materialIndex,
                 name: row.cells[1] ? row.cells[1].textContent : '자재 ' + (materialIndex + 1),
                 category: row.cells[0] ? row.cells[0].textContent : '기본',
-                data: appState.materialData ? appState.materialData[materialIndex] : null
+                data: appState.materials ? appState.materials[materialIndex] : null
             };
 
             self.dragStartPosition = {
@@ -2586,7 +2741,7 @@ var dragDropManager = {
 
     // 자재 정보 모달 표시
     showMaterialInfo: function(sceneId, placement) {
-        var materialData = appState.materialData ? appState.materialData[placement.materialIndex] : null;
+        var materialData = appState.materials ? appState.materials[placement.materialIndex] : null;
 
         var content = '<h4>' + placement.materialName + '</h4>';
         content += '<p><strong>카테고리:</strong> ' + placement.materialCategory + '</p>';
