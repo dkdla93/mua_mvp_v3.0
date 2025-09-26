@@ -185,21 +185,32 @@ var utils = {
 
     // 브라우저 지원 여부 검사
     checkBrowserSupport: function() {
-        var unsupportedFeatures = [];
+        var criticalFeatures = [];
+        var warningFeatures = [];
 
-        if (!window.FileReader) unsupportedFeatures.push('FileReader API');
-        if (!window.XLSX) unsupportedFeatures.push('Excel 파싱 라이브러리');
-        if (!window.PptxGenJS) unsupportedFeatures.push('PowerPoint 생성 라이브러리');
-        if (!document.querySelector) unsupportedFeatures.push('CSS 선택자');
+        // 필수 기능들
+        if (!window.FileReader) criticalFeatures.push('FileReader API');
+        if (!document.querySelector) criticalFeatures.push('CSS 선택자');
 
-        if (unsupportedFeatures.length > 0) {
+        // 선택적 기능들 (경고만 표시)
+        if (!window.XLSX) warningFeatures.push('Excel 파싱 라이브러리');
+        if (!window.PptxGenJS) warningFeatures.push('PowerPoint 생성 라이브러리');
+
+        // 치명적 오류가 있는 경우만 차단
+        if (criticalFeatures.length > 0) {
             this.showError(
-                '현재 브라우저에서 지원하지 않는 기능이 있습니다:\n' +
-                unsupportedFeatures.join(', ') + '\n\n' +
+                '현재 브라우저에서 지원하지 않는 필수 기능이 있습니다:\n' +
+                criticalFeatures.join(', ') + '\n\n' +
                 '최신 브라우저를 사용해 주세요.',
                 '브라우저 호환성 문제'
             );
             return false;
+        }
+
+        // 경고 기능들이 있으면 콘솔에만 출력
+        if (warningFeatures.length > 0) {
+            console.warn('일부 기능이 제한될 수 있습니다:', warningFeatures.join(', '));
+            console.warn('모든 기능을 사용하려면 페이지를 새로고침해주세요.');
         }
 
         return true;
@@ -317,25 +328,49 @@ var fileUploadManager = {
         var self = this;
 
         // 엑셀 파일 입력
-        document.getElementById('excel-file').addEventListener('change', function(e) {
-            if (e.target.files.length > 0) {
-                self.handleFiles(e.target.files, 'excel-upload');
-            }
-        });
+        var excelInput = document.getElementById('excel-file');
+        if (excelInput) {
+            excelInput.addEventListener('change', function(e) {
+                console.log('Excel file selected:', e.target.files);
+                if (e.target.files.length > 0) {
+                    self.handleFiles(e.target.files, 'excel-upload');
+                } else {
+                    console.warn('No excel file selected');
+                }
+            });
+        } else {
+            console.error('엑셀 파일 입력 요소를 찾을 수 없습니다.');
+        }
 
         // 미니맵 파일 입력
-        document.getElementById('minimap-file').addEventListener('change', function(e) {
-            if (e.target.files.length > 0) {
-                self.handleFiles(e.target.files, 'minimap-upload');
-            }
-        });
+        var minimapInput = document.getElementById('minimap-file');
+        if (minimapInput) {
+            minimapInput.addEventListener('change', function(e) {
+                console.log('Minimap file selected:', e.target.files);
+                if (e.target.files.length > 0) {
+                    self.handleFiles(e.target.files, 'minimap-upload');
+                } else {
+                    console.warn('No minimap file selected');
+                }
+            });
+        } else {
+            console.error('미니맵 파일 입력 요소를 찾을 수 없습니다.');
+        }
 
         // 장면 이미지 파일 입력
-        document.getElementById('scenes-files').addEventListener('change', function(e) {
-            if (e.target.files.length > 0) {
-                self.handleFiles(e.target.files, 'scenes-upload');
-            }
-        });
+        var scenesInput = document.getElementById('scenes-files');
+        if (scenesInput) {
+            scenesInput.addEventListener('change', function(e) {
+                console.log('Scene files selected:', e.target.files);
+                if (e.target.files.length > 0) {
+                    self.handleFiles(e.target.files, 'scenes-upload');
+                } else {
+                    console.warn('No scene files selected');
+                }
+            });
+        } else {
+            console.error('장면 파일 입력 요소를 찾을 수 없습니다.');
+        }
 
         // 파일 입력 초기화 (재선택 허용)
         this.setupFileInputReset();
@@ -355,18 +390,28 @@ var fileUploadManager = {
     },
 
     handleFiles: function(files, uploadType) {
-        if (!files || files.length === 0) return;
+        console.log('handleFiles called with:', files, uploadType);
+
+        if (!files || files.length === 0) {
+            console.warn('No files to handle');
+            return;
+        }
 
         switch(uploadType) {
             case 'excel-upload':
+                console.log('Processing Excel file:', files[0].name);
                 this.handleExcelFile(files[0]);
                 break;
             case 'minimap-upload':
+                console.log('Processing Minimap file:', files[0].name);
                 this.handleMinimapFile(files[0]);
                 break;
             case 'scenes-upload':
+                console.log('Processing Scene files:', files.length, 'files');
                 this.handleSceneFiles(files);
                 break;
+            default:
+                console.error('Unknown upload type:', uploadType);
         }
     },
 
