@@ -364,7 +364,7 @@ window.WorkspaceManager = function(eventManager, stateManager) {
     }
 
     /**
-     * 미니맵 드래그 그리기 설정
+     * 미니맵 드래그 그리기 설정 (성능 최적화 버전)
      */
     function setupMinimapDragDrawing() {
         const minimapContainer = document.getElementById('minimap-container');
@@ -386,6 +386,34 @@ window.WorkspaceManager = function(eventManager, stateManager) {
         let currentBox = null;
         let startX = 0;
         let startY = 0;
+        let animationFrameId = null;
+        let lastUpdateTime = 0;
+        const updateThreshold = 16; // 60fps를 위한 16ms 간격
+
+        // 성능 최적화된 박스 업데이트 함수
+        function updateBoxPosition(currentX, currentY) {
+            if (!currentBox || !isDrawing) return;
+
+            const now = performance.now();
+            if (now - lastUpdateTime < updateThreshold) return;
+
+            const left = Math.min(startX, currentX);
+            const top = Math.min(startY, currentY);
+            const width = Math.abs(currentX - startX);
+            const height = Math.abs(currentY - startY);
+
+            // CSS transform 사용으로 리플로우 최소화
+            requestAnimationFrame(() => {
+                if (currentBox) {
+                    currentBox.style.left = left + 'px';
+                    currentBox.style.top = top + 'px';
+                    currentBox.style.width = width + 'px';
+                    currentBox.style.height = height + 'px';
+                }
+            });
+
+            lastUpdateTime = now;
+        }
 
         // 마우스 다운 - 드래그 시작
         minimapContainer.addEventListener('mousedown', function(e) {
@@ -400,6 +428,7 @@ window.WorkspaceManager = function(eventManager, stateManager) {
                 e.stopPropagation();
 
                 isDrawing = true;
+                lastUpdateTime = 0; // 초기화
 
                 const rect = minimapContainer.getBoundingClientRect();
                 startX = e.clientX - rect.left;
@@ -418,6 +447,7 @@ window.WorkspaceManager = function(eventManager, stateManager) {
                     height: 0px;
                     pointer-events: auto;
                     cursor: move;
+                    will-change: transform;
                 `;
 
                 overlaysContainer.appendChild(currentBox);
@@ -428,7 +458,7 @@ window.WorkspaceManager = function(eventManager, stateManager) {
             }
         });
 
-        // 마우스 이동 - 드래그 중
+        // 마우스 이동 - 드래그 중 (성능 최적화)
         minimapContainer.addEventListener('mousemove', function(e) {
             if (!isDrawing || !currentBox) return;
 
@@ -436,15 +466,8 @@ window.WorkspaceManager = function(eventManager, stateManager) {
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
 
-            const left = Math.min(startX, currentX);
-            const top = Math.min(startY, currentY);
-            const width = Math.abs(currentX - startX);
-            const height = Math.abs(currentY - startY);
-
-            currentBox.style.left = left + 'px';
-            currentBox.style.top = top + 'px';
-            currentBox.style.width = width + 'px';
-            currentBox.style.height = height + 'px';
+            // Throttled update with requestAnimationFrame
+            updateBoxPosition(currentX, currentY);
         });
 
         // 마우스 업 - 드래그 종료
@@ -453,11 +476,20 @@ window.WorkspaceManager = function(eventManager, stateManager) {
 
             isDrawing = false;
 
+            // 애니메이션 프레임 정리
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+
             // 너무 작은 박스는 제거
             if (parseInt(currentBox.style.width) < 10 || parseInt(currentBox.style.height) < 10) {
                 overlaysContainer.removeChild(currentBox);
                 AppConfig.log('너무 작은 박스 제거됨');
             } else {
+                // will-change 속성 제거 (완성된 요소는 최적화 해제)
+                currentBox.style.willChange = 'auto';
+
                 // 박스에 삭제 버튼 추가
                 addBoxDeleteButton(currentBox);
                 AppConfig.log('빨간박스 생성 완료', {
@@ -471,6 +503,37 @@ window.WorkspaceManager = function(eventManager, stateManager) {
             currentBox = null;
         });
 
+        // 터치 이벤트 지원 추가 (모바일 호환성)
+        minimapContainer.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                bubbles: true
+            });
+            minimapContainer.dispatchEvent(mouseEvent);
+        }, { passive: false });
+
+        minimapContainer.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                bubbles: true
+            });
+            minimapContainer.dispatchEvent(mouseEvent);
+        }, { passive: false });
+
+        minimapContainer.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            const mouseEvent = new MouseEvent('mouseup', {
+                bubbles: true
+            });
+            minimapContainer.dispatchEvent(mouseEvent);
+        });
+
         // 전체 제거 버튼 이벤트
         if (clearButton) {
             clearButton.addEventListener('click', function() {
@@ -480,7 +543,7 @@ window.WorkspaceManager = function(eventManager, stateManager) {
             });
         }
 
-        AppConfig.log('미니맵 드래그 그리기 설정 완료');
+        AppConfig.log('미니맵 드래그 그리기 설정 완료 (성능 최적화 적용)');
     }
 
     /**

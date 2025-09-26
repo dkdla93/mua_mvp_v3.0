@@ -271,13 +271,38 @@ window.AppConfig = {
      * 브라우저 호환성 검사
      */
     checkBrowserCompatibility: function() {
-        const requiredFeatures = this.get('BROWSER.REQUIRED_FEATURES', []);
-        const unsupportedFeatures = [];
+        var unsupportedFeatures = [];
 
-        for (const feature of requiredFeatures) {
-            if (!(feature in window)) {
-                unsupportedFeatures.push(feature);
+        // 필수 기능들을 개별적으로 검사
+        try {
+            // FileReader 지원 확인
+            if (typeof FileReader === 'undefined') {
+                unsupportedFeatures.push('FileReader');
             }
+
+            // localStorage 지원 확인
+            if (typeof Storage === 'undefined' || !window.localStorage) {
+                unsupportedFeatures.push('localStorage');
+            }
+
+            // querySelector 지원 확인
+            if (!document.querySelector) {
+                unsupportedFeatures.push('querySelector');
+            }
+
+            // addEventListener 지원 확인
+            if (!document.addEventListener) {
+                unsupportedFeatures.push('addEventListener');
+            }
+
+            // JSON 지원 확인
+            if (typeof JSON === 'undefined') {
+                unsupportedFeatures.push('JSON');
+            }
+
+        } catch (error) {
+            // 검사 중 오류 발생 시 호환 가능한 것으로 간주
+            console.warn('브라우저 호환성 검사 중 오류 발생:', error);
         }
 
         return {

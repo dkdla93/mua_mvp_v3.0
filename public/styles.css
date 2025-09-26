@@ -152,16 +152,18 @@ body {
     top: 0;
     left: 0;
     width: 100%;
+    height: 100%;
     padding: 30px;
     box-sizing: border-box;
     transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
     transform: translateX(50px);
+    overflow-y: auto;
 }
 
 .step-content.active {
     display: block;
     opacity: 1;
-    position: relative;
+    position: absolute;
     transform: translateX(0);
 }
 
@@ -337,20 +339,81 @@ body {
 .excel-sheet-info {
     background: #f8f9fa;
     border: 1px solid #dee2e6;
-    border-radius: 4px;
-    padding: 15px;
-    margin-top: 10px;
+    border-radius: 6px;
+    padding: 20px;
+    margin-top: 15px;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 400px; /* 최소 너비 확보 */
+}
+
+/* 모바일 반응형 */
+@media (max-width: 768px) {
+    .excel-sheet-info {
+        min-width: unset;
+        padding: 15px;
+    }
+
+    .excel-sheet-item {
+        padding: 8px 12px;
+    }
+
+    .excel-sheet-item .sheet-summary {
+        font-size: 12px;
+        line-height: 1.3;
+    }
+
+    .excel-sheet-item .sheet-summary strong {
+        font-size: 13px;
+    }
+
+    .excel-sheet-item .material-types {
+        font-size: 11px;
+    }
 }
 
 .excel-sheet-item {
-    display: flex;
-    justify-content: space-between;
-    padding: 5px 0;
+    padding: 10px 16px;
     border-bottom: 1px solid #eee;
+    border-radius: 6px;
+    margin: 4px 0;
+    background: white;
+    transition: all 0.2s ease;
+    line-height: 1.5;
+}
+
+.excel-sheet-item:hover {
+    background: #f0f9ff;
+    border-color: #ddd;
+    transform: translateX(2px);
 }
 
 .excel-sheet-item:last-child {
     border-bottom: none;
+}
+
+.excel-sheet-item .sheet-summary {
+    color: #333;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.excel-sheet-item .sheet-summary strong {
+    color: #333;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.excel-sheet-item .material-count {
+    color: #667eea;
+    font-weight: 600;
+}
+
+.excel-sheet-item .material-types {
+    color: #666;
+    font-size: 12px;
+    font-style: italic;
 }
 
 /* 장면 이미지 썸네일 그리드 (업로드 완료 후 표시) */
@@ -1450,12 +1513,20 @@ body {
 }
 
 .material-table tbody tr {
-    cursor: grab;
+    cursor: pointer; /* 클릭 가능함을 표시 */
     transition: all 0.2s ease;
+    user-select: none; /* 텍스트 선택 방지 */
+}
+
+.material-table tbody tr:active {
+    transform: scale(0.995); /* 클릭 시 살짝 축소 효과 */
+    background-color: #e0f2fe !important;
 }
 
 .material-table tbody tr:hover {
     background-color: #f8f9ff;
+    transform: translateY(-1px); /* 살짝 들어올리는 효과 */
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1); /* 은은한 그림자 */
 }
 
 .material-table tbody tr[draggable="true"]:active {
@@ -1581,6 +1652,94 @@ body {
     margin-top: 20px;
 }
 
+/* 새로운 좌우 레이아웃 */
+.workspace-main-row {
+    display: flex;
+    gap: 20px;
+    width: 100%;
+    min-height: 600px;
+}
+
+.left-panel {
+    flex: 0 0 65%;
+    max-width: 65%;
+}
+
+.right-panel {
+    flex: 0 0 35%;
+    max-width: 35%;
+}
+
+/* 장면+미니맵 통합 영역 */
+.scene-content-container {
+    display: flex;
+    gap: 15px;
+    width: 100%;
+}
+
+.scene-image-area {
+    flex: 0 0 65%;
+    max-width: 65%;
+}
+
+.minimap-area {
+    flex: 0 0 35%;
+    max-width: 35%;
+}
+
+.minimap-area h4 {
+    margin: 0 0 10px 0;
+    color: #666;
+    font-size: 14px;
+    font-weight: normal;
+}
+
+/* 새로운 통합형 미니맵 컨테이너 */
+.minimap-area .minimap-container {
+    position: relative;
+    width: 100%;
+    height: 200px;
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.minimap-area .minimap-image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+}
+
+/* 합성 장면 이미지 Canvas */
+.composite-scene-container {
+    position: relative;
+    width: 100%;
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.composite-scene-canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    cursor: crosshair;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.composite-scene-canvas.drag-over {
+    border-color: #007bff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.25);
+}
+
+/* 기존 스타일 (호환성 유지) */
 .workspace-top-row {
     display: flex;
     gap: 20px;
@@ -1677,9 +1836,15 @@ body {
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    flex: 1;
-    max-width: 70%;
+    width: 100%;
+    height: 100%;
     overflow: hidden;
+}
+
+.scene-workspace h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
 }
 
 .material-workspace {
@@ -1688,8 +1853,15 @@ body {
     padding: 20px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     width: 100%;
-    overflow-x: auto;
-    max-width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+.material-workspace h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 18px;
 }
 
 /* 드래그 가이드 */
@@ -1771,6 +1943,8 @@ body {
 
     .step-content {
         padding: 20px;
+        position: absolute;
+        height: 100%;
     }
 
     .file-upload-area {
@@ -1788,9 +1962,11 @@ body {
     text-align: center;
 }
 
-.material-assign-checkbox {
-    transform: scale(1.2);
+.material-assign-checkbox,
+.material-select-checkbox {
+    transform: scale(1.3); /* 체크박스 크기 더 키우기 */
     cursor: pointer;
+    margin: 2px; /* 클릭 영역 여유 공간 */
 }
 
 .material-no-scene {
@@ -1799,13 +1975,18 @@ body {
 }
 
 /* 매칭된 자재 행 스타일 */
-.material-assigned {
+.material-assigned,
+.material-selected {
     background-color: #f0f9ff !important;
     border-left: 4px solid #3b82f6;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.1);
 }
 
-.material-assigned:hover {
+.material-assigned:hover,
+.material-selected:hover {
     background-color: #e0f2fe !important;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+    transform: translateY(-1px);
 }
 
 .material-assigned .material-assign-checkbox {
@@ -1872,6 +2053,128 @@ tr:not(.material-assigned):hover {
     color: #999 !important;
 }
 
+/* 장면별 자재 테이블 (자재표의 미니 버전) */
+.scene-material-table-container {
+    margin: 15px 0;
+}
+
+.scene-material-table-container h5 {
+    font-size: 12px;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 8px;
+    padding: 0;
+}
+
+.scene-material-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+    background: white;
+    font-size: 7pt; /* 더 작은 글씨 크기 */
+    border: 1px solid #e0e6ed;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.scene-material-table th,
+.scene-material-table td {
+    padding: 6px 8px; /* 기존 10px보다 작게 */
+    text-align: left;
+    border-bottom: 1px solid #e0e6ed;
+    line-height: 1.2;
+}
+
+.scene-material-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #333;
+    font-size: 7pt; /* 헤더도 동일하게 작게 */
+}
+
+.scene-material-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.scene-material-table tbody tr:hover {
+    background-color: #f8f9ff;
+}
+
+.scene-material-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* 장면별 자재 테이블 컬럼 너비 (자재표와 동일) */
+.scene-material-table .material-id-col {
+    width: 60px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.scene-material-table .material-name-col {
+    width: 140px; /* MATERIAL 컬럼 넓게 (줄넘김 방지) */
+    font-weight: 600;
+}
+
+.scene-material-table .material-item-col {
+    width: 130px; /* ITEM 컬럼 조금 줄이기 */
+}
+
+.scene-material-table .material-area-col {
+    width: 100px; /* AREA 컬럼 유지 */
+}
+
+.scene-material-table .material-remarks-col {
+    width: 80px; /* REMARKS 컬럼 더 좁게 */
+}
+
+.scene-material-table .material-image-col {
+    width: 60px;
+    text-align: center;
+}
+
+.scene-material-table .material-action-col {
+    width: 60px;
+    text-align: center;
+}
+
+/* 제거 버튼 스타일 */
+.btn-remove-material {
+    background: none;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+}
+
+.btn-remove-material:hover {
+    background-color: #fee;
+    transform: scale(1.1);
+}
+
+/* 빈 상태 메시지 스타일 */
+.scene-material-table .empty-state {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 20px;
+    font-size: 8pt; /* 빈 상태 메시지 글씨 크기 조정 */
+}
+
+/* 장면별 자재 테이블 반응형 */
+@media (max-width: 768px) {
+    .scene-material-table {
+        font-size: 6pt; /* 모바일에서 더 작게 */
+    }
+
+    .scene-material-table th,
+    .scene-material-table td {
+        padding: 4px 6px;
+    }
+}
+
 /* 자재 드래그 안내 */
 .drag-instruction {
     background-color: #f0f9ff;
@@ -1888,4 +2191,132 @@ tr:not(.material-assigned):hover {
     background-color: #fef3c7;
     border-color: #fbbf24;
     color: #92400e;
+}
+
+/* 분리된 레이아웃 (3단계) */
+.scene-workspace-layout {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+}
+
+.current-scene-section {
+    flex: 0 0 60%;
+    min-width: 0;
+}
+
+.current-scene-section h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.scene-display {
+    position: relative;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.scene-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 400px;
+    object-fit: contain;
+}
+
+.scene-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    color: white;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.scene-material-positions {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.minimap-section {
+    flex: 0 0 35%;
+    min-width: 0;
+}
+
+.minimap-section h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.minimap-container {
+    position: relative;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f8f9fa;
+    min-height: 200px;
+    max-height: 400px;
+}
+
+.minimap-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    cursor: crosshair;
+}
+
+.minimap-overlays {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.minimap-overlays .minimap-box {
+    pointer-events: auto;
+}
+
+.minimap-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: #6b7280;
+    font-style: italic;
+    background: #f9fafb;
+}
+
+.scene-material-list-section {
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #e5e7eb;
+}
+
+/* 반응형 조정 */
+@media (max-width: 1024px) {
+    .scene-workspace-layout {
+        flex-direction: column;
+    }
+
+    .current-scene-section,
+    .minimap-section {
+        flex: none;
+        width: 100%;
+    }
 }

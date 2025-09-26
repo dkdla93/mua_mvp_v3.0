@@ -12,7 +12,7 @@
 
     <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.min.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/pptxgenjs@3.12.0/dist/pptxgen.bundle.js" crossorigin="anonymous"></script>
 
     <!-- Fallback 라이브러리 체크 -->
     <script>
@@ -209,87 +209,48 @@
         </div>
     </div>
 
-    <!-- New Core System (Phase 1) -->
+    <!-- New Core System (Phase 1) - TEMPORARILY DISABLED FOR DEBUGGING -->
+    <!--
     <script src="js/core/constants.js"></script>
     <script src="js/core/module-loader.js"></script>
     <script src="js/core/app-core.js"></script>
 
-    <!-- Utility Libraries -->
     <script src="js/utils/event-manager.js"></script>
     <script src="js/utils/file-processor.js"></script>
     <script src="js/utils/state-manager.js"></script>
     <script src="js/utils/coordinate-system.js"></script>
     <script src="js/utils/worker-manager.js"></script>
 
-    <!-- Refactored Managers (Phase 2) -->
     <script src="js/managers/file-upload-manager.js"></script>
     <script src="js/managers/process-manager.js"></script>
     <script src="js/managers/workspace-manager.js"></script>
     <script src="js/managers/drag-drop-manager.js"></script>
+    -->
 
     <!-- Main Application -->
     <script src="app.js"></script>
 
     <!-- Application Initialization -->
     <script>
-        // 새로운 코어 시스템으로 애플리케이션 초기화
-        document.addEventListener('DOMContentLoaded', async function() {
+        // 기존 시스템으로 애플리케이션 초기화 (모듈 시스템 디버깅 중)
+        document.addEventListener('DOMContentLoaded', function() {
             try {
-                console.log('🚀 새로운 코어 시스템으로 애플리케이션 초기화 시작...');
+                console.log('🚀 애플리케이션 초기화 시작 (레거시 시스템)...');
 
-                // AppCore 초기화
-                const initSuccess = await AppCore.initialize();
-
-                if (initSuccess) {
-                    console.log('✅ 애플리케이션 초기화 완료');
-
-                    // 기존 시스템과의 호환성을 위한 초기화 호출
-                    if (typeof initializeNavigationSystem === 'function') {
-                        initializeNavigationSystem();
-                    }
-                    if (typeof fileUploadManager !== 'undefined' && fileUploadManager.init) {
-                        fileUploadManager.init();
-                    }
-
-                    // 성능 정보 출력 (개발 모드에서만)
-                    if (AppConfig.get('DEBUG.ENABLED', false)) {
-                        console.table(AppCore.getPerformanceInfo());
-                        console.log('모듈 정보:', ModuleLoader.getInfo());
-                    }
-                } else {
-                    throw new Error('애플리케이션 초기화 실패');
+                // 기존 시스템 초기화
+                if (typeof initializeNavigationSystem === 'function') {
+                    initializeNavigationSystem();
                 }
+                if (typeof fileUploadManager !== 'undefined' && fileUploadManager.init) {
+                    fileUploadManager.init();
+                }
+
+                console.log('✅ 애플리케이션 초기화 완료 (성능 최적화된 빨간박스 포함)');
             } catch (error) {
                 console.error('💥 애플리케이션 초기화 중 오류:', error);
-
-                // 폴백: 기존 시스템으로 초기화
-                console.log('🔄 기존 시스템으로 폴백 초기화 시도...');
-                try {
-                    if (typeof initializeNavigationSystem === 'function') {
-                        initializeNavigationSystem();
-                    }
-                    if (typeof fileUploadManager !== 'undefined' && fileUploadManager.init) {
-                        fileUploadManager.init();
-                    }
-                    console.log('✅ 폴백 초기화 완료');
-                } catch (fallbackError) {
-                    console.error('💥 폴백 초기화도 실패:', fallbackError);
-                    alert('시스템 초기화에 실패했습니다. 페이지를 새로고침해주세요.');
-                }
+                alert('시스템 초기화에 실패했습니다. 페이지를 새로고침해주세요.');
             }
         });
-
-        // 개발자 도구에서 사용할 수 있는 디버그 함수들
-        if (AppConfig.get('DEBUG.ENABLED', false)) {
-            window.debugApp = {
-                getState: () => AppCore.getState(),
-                getPerformance: () => AppCore.getPerformanceInfo(),
-                getModules: () => ModuleLoader.getInfo(),
-                getBootLog: () => AppCore.debug.getBootLog(),
-                getErrors: () => AppCore.debug.getErrors()
-            };
-            console.log('🔧 디버그 도구 사용 가능: debugApp 객체를 콘솔에서 사용하세요');
-        }
     </script>
 </body>
 </html>
