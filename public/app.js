@@ -2300,13 +2300,28 @@ var processManager = {
     },
 
     renderProcessContent: function() {
-        var contentContainer = document.getElementById('process-content');
-        var currentProcess = this.getCurrentProcess();
+        console.log('🎯 renderProcessContent 시작');
 
-        if (!currentProcess) return;
+        var contentContainer = document.getElementById('process-content');
+        console.log('📦 contentContainer 찾기 결과:', contentContainer);
+
+        if (!contentContainer) {
+            console.error('❌ process-content 요소를 찾을 수 없습니다');
+            return;
+        }
+
+        var currentProcess = this.getCurrentProcess();
+        console.log('🔍 currentProcess 찾기 결과:', currentProcess);
+
+        if (!currentProcess) {
+            console.error('❌ 현재 공정을 찾을 수 없습니다');
+            return;
+        }
 
         var totalScenes = appState.sceneImages ? appState.sceneImages.length : 0;
         var selectedCount = currentProcess.selectedScenes ? currentProcess.selectedScenes.length : 0;
+
+        console.log('📊 장면 정보 - 전체:', totalScenes, '선택:', selectedCount);
 
         contentContainer.innerHTML =
             '<div class="process-header">' +
@@ -2324,12 +2339,16 @@ var processManager = {
                 '</div>' +
             '</div>';
 
+        console.log('✅ DOM 업데이트 완료, renderSceneSelection() 호출');
         this.renderSceneSelection();
+        console.log('✅ renderProcessContent 완료');
     },
 
     renderSceneSelection: function() {
+        console.log('🎭 renderSceneSelection 시작');
         this.renderAvailableScenes();
         this.renderAllScenes();
+        console.log('🎭 renderSceneSelection 완료');
     },
 
     renderAvailableScenes: function() {
