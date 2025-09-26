@@ -1502,22 +1502,54 @@ var stepController = {
 
                 // PPT 파일 다운로드 - Promise 기반 처리
                 try {
-                    pptx.save(fileName).then(function() {
-                        console.log('PPT 다운로드 성공!');
-                        utils.hideLoading();
-                        utils.showSuccess('PPT가 성공적으로 생성되고 다운로드되었습니다!');
-                    }).catch(function(saveError) {
-                        console.error('PPT 저장 오류:', saveError);
-                        utils.hideLoading();
-                        utils.showError('PPT 저장 중 오류가 발생했습니다. 브라우저에서 다운로드를 허용해주세요.');
-                    });
-                } catch (saveError) {
-                    // save()가 Promise를 반환하지 않는 경우를 위한 fallback
-                    console.log('동기식 저장 시도...');
-                    pptx.save(fileName);
+                    // PptxGenJS save() 메서드 호출
+                    var saveResult = pptx.save(fileName);
 
+                    // Promise를 반환하는 경우
+                    if (saveResult && typeof saveResult.then === 'function') {
+                        console.log('Promise 기반 저장 시도...');
+                        saveResult.then(function() {
+                            console.log('PPT 다운로드 성공!');
+                            utils.hideLoading();
+                            utils.showSuccess('PPT가 성공적으로 생성되고 다운로드되었습니다!');
+                        }).catch(function(saveError) {
+                            console.error('PPT 저장 오류:', saveError);
+                            utils.hideLoading();
+
+                            var errorMsg = 'PPT 저장 중 오류가 발생했습니다.\n\n';
+                            if (saveError.message.includes('라이브러리가 로드되지')) {
+                                errorMsg += '라이브러리 로딩 문제입니다. 페이지를 새로고침해주세요.';
+                            } else {
+                                errorMsg += '가능한 해결방법:\n';
+                                errorMsg += '1. 브라우저에서 팝업/다운로드 차단을 해제해주세요\n';
+                                errorMsg += '2. 다른 브라우저(Chrome, Firefox)를 사용해보세요\n';
+                                errorMsg += '3. 시크릿/인코그니토 모드를 사용해보세요';
+                            }
+                            utils.showError(errorMsg);
+                        });
+                    } else {
+                        // 동기식 저장 (일반적인 경우)
+                        console.log('동기식 저장 완료');
+
+                        // 다운로드 후 짧은 지연 후 성공 메시지
+                        setTimeout(function() {
+                            utils.hideLoading();
+
+                            // 브라우저 다운로드 안내
+                            var successMsg = 'PPT가 성공적으로 생성되었습니다!\n\n';
+                            successMsg += '파일명: ' + fileName + '.pptx\n\n';
+                            successMsg += '다운로드가 시작되지 않은 경우:\n';
+                            successMsg += '• 브라우저 하단의 다운로드 표시줄 확인\n';
+                            successMsg += '• 브라우저 다운로드 폴더 확인\n';
+                            successMsg += '• 팝업 차단 해제 후 재시도';
+
+                            utils.showSuccess(successMsg);
+                        }, 500);
+                    }
+                } catch (saveError) {
+                    console.error('PPT 저장 예외:', saveError);
                     utils.hideLoading();
-                    utils.showSuccess('PPT가 성공적으로 생성되었습니다! 다운로드를 확인해주세요.');
+                    utils.showError('PPT 저장 중 예외가 발생했습니다: ' + saveError.message + '\n\n페이지를 새로고침 후 다시 시도해주세요.');
                 }
 
             } catch (error) {
